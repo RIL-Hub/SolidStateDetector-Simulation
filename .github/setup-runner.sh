@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Setup script for self-hosted GitHub Actions runner with NVIDIA GPU
+# Setup script for self-hosted GitHub Actions runner (CPU)
 # Run with: sudo bash .github/setup-runner.sh
 set -euo pipefail
 
@@ -14,18 +14,18 @@ RUNNER_DIR="${RUNNER_HOME}/actions-runner"
 RUNNER_VERSION="2.322.0"
 
 echo "============================================================"
-echo "GitHub Actions Self-Hosted Runner Setup (GPU)"
+echo "GitHub Actions Self-Hosted Runner Setup"
 echo "============================================================"
 
 # --- System packages ---
 echo ""
-echo "[1/7] Installing system packages..."
+echo "[1/5] Installing system packages..."
 apt-get update -qq
 apt-get install -y -qq curl tar build-essential cmake git jq
 
 # --- Create unprivileged runner user ---
 echo ""
-echo "[2/7] Creating runner user '${RUNNER_USER}'..."
+echo "[2/5] Creating runner user '${RUNNER_USER}'..."
 if id "${RUNNER_USER}" &>/dev/null; then
     echo "  User '${RUNNER_USER}' already exists, skipping."
 else
@@ -33,36 +33,15 @@ else
     echo "  User '${RUNNER_USER}' created."
 fi
 
-# --- NVIDIA driver ---
-echo ""
-echo "[3/7] Installing NVIDIA drivers..."
-if command -v nvidia-smi &>/dev/null; then
-    echo "  NVIDIA driver already installed:"
-    nvidia-smi --query-gpu=driver_version,name --format=csv,noheader
-else
-    apt-get install -y -qq ubuntu-drivers-common
-    ubuntu-drivers autoinstall
-    echo ""
-    echo "  *** NVIDIA driver installed. A REBOOT is required. ***"
-    echo "  Re-run this script after rebooting to complete setup."
-    exit 0
-fi
-
-# --- Add runner user to GPU groups ---
-echo ""
-echo "[4/7] Adding '${RUNNER_USER}' to video and render groups..."
-usermod -aG video "${RUNNER_USER}"
-usermod -aG render "${RUNNER_USER}"
-
 # --- Create hostedtoolcache for julia-actions/setup-julia ---
 echo ""
-echo "[5/7] Creating /opt/hostedtoolcache..."
+echo "[3/5] Creating /opt/hostedtoolcache..."
 mkdir -p /opt/hostedtoolcache
 chown "${RUNNER_USER}:${RUNNER_USER}" /opt/hostedtoolcache
 
 # --- Download GitHub Actions runner ---
 echo ""
-echo "[6/7] Downloading GitHub Actions runner v${RUNNER_VERSION}..."
+echo "[4/5] Downloading GitHub Actions runner v${RUNNER_VERSION}..."
 mkdir -p "${RUNNER_DIR}"
 cd "${RUNNER_DIR}"
 
@@ -80,15 +59,12 @@ fi
 
 # --- Cron jobs ---
 echo ""
-echo "[7/7] Setting up cron jobs..."
+echo "[5/5] Setting up cron jobs..."
 
 # Weekly Julia depot cleanup (Sunday 3am)
 DEPOT_CRON="0 3 * * 0 find ${RUNNER_HOME}/.julia/compiled -type f -mtime +30 -delete 2>/dev/null; find ${RUNNER_HOME}/.julia/packages -maxdepth 2 -type d -empty -delete 2>/dev/null"
 
-# Hourly GPU health check
-GPU_HEALTH_CRON="0 * * * * nvidia-smi --query-gpu=temperature.gpu,utilization.gpu,memory.used --format=csv,noheader >> /var/log/gpu-health.log 2>&1"
-
-(crontab -u "${RUNNER_USER}" -l 2>/dev/null || true; echo "${DEPOT_CRON}"; echo "${GPU_HEALTH_CRON}") | sort -u | crontab -u "${RUNNER_USER}" -
+(crontab -u "${RUNNER_USER}" -l 2>/dev/null || true; echo "${DEPOT_CRON}") | sort -u | crontab -u "${RUNNER_USER}" -
 echo "  Cron jobs installed for '${RUNNER_USER}'."
 
 # --- Done ---
@@ -104,7 +80,7 @@ echo "     su - ${RUNNER_USER}"
 echo "     cd ${RUNNER_DIR}"
 echo "     ./config.sh --url https://github.com/OWNER/REPO \\"
 echo "                 --token YOUR_REGISTRATION_TOKEN \\"
-echo "                 --labels self-hosted,linux,x64,gpu \\"
+echo "                 --labels self-hosted,linux,x64 \\"
 echo "                 --name \$(hostname) \\"
 echo "                 --work _work"
 echo ""
