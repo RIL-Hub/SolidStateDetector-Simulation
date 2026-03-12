@@ -1,0 +1,12 @@
+name = "CZTCrossStripSim"
+uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+[deps]
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+SolidStateDetectors = "71e43887-2571-5e41-b927-bca0e82e5480"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[compat]
+julia = "1.10"
+SolidStateDetectors = "0.11"

@@ -1,0 +1,117 @@
+name: CZT Cross-Strip Detector
+
+units:
+  length: mm
+  angle: deg
+  potential: V
+  temperature: K
+
+grid:
+  coordinates: cartesian
+  axes:
+    x:
+      from: -10
+      to: 10
+      boundaries:
+        left: reflecting
+        right: reflecting
+    y:
+      from: -10
+      to: 10
+      boundaries:
+        left: reflecting
+        right: reflecting
+    z:
+      from: 0
+      to: 10
+      boundaries:
+        left: fixed
+        right: fixed
+
+medium: vacuum
+
+detectors:
+  - semiconductor:
+      material: CdZnTe
+      temperature: 300
+      geometry:
+        type: box
+        widths:
+          x: 20
+          y: 20
+          z: 10
+        origin:
+          x: 0
+          y: 0
+          z: 5
+
+    contacts:
+      # Cathode - full planar electrode on top at z=10
+      - id: 1
+        potential: -1000
+        geometry:
+          type: box
+          widths:
+            x: 20
+            y: 20
+            z: 0
+          origin:
+            x: 0
+            y: 0
+            z: 10
+
+      # Anode strip 1 - bottom, centered at y = -7.5
+      - id: 2
+        potential: 0
+        geometry:
+          type: box
+          widths:
+            x: 20
+            y: 3
+            z: 0
+          origin:
+            x: 0
+            y: -7.5
+            z: 0
+
+      # Anode strip 2 - bottom, centered at y = -2.5
+      - id: 3
+        potential: 0
+        geometry:
+          type: box
+          widths:
+            x: 20
+            y: 3
+            z: 0
+          origin:
+            x: 0
+            y: -2.5
+            z: 0
+
+      # Anode strip 3 - bottom, centered at y = 2.5
+      - id: 4
+        potential: 0
+        geometry:
+          type: box
+          widths:
+            x: 20
+            y: 3
+            z: 0
+          origin:
+            x: 0
+            y: 2.5
+            z: 0
+
+      # Anode strip 4 - bottom, centered at y = 7.5
+      - id: 5
+        potential: 0
+        geometry:
+          type: box
+          widths:
+            x: 20
+            y: 3
+            z: 0
+          origin:
+            x: 0
+            y: 7.5
+            z: 0

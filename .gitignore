@@ -1,0 +1,6 @@
+Manifest.toml
+output/
+*.jld2
+*.png
+*.pdf
+*.svg

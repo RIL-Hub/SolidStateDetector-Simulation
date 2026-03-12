@@ -1,0 +1,111 @@
+name: CZT Cross-Strip Simulation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'geometries/**'
+      - 'scripts/**'
+      - 'Project.toml'
+  workflow_dispatch:
+
+jobs:
+  simulate-gpu:
+    name: Simulate (GPU)
+    runs-on: [self-hosted, linux, x64, gpu]
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - name: Add LegendJuliaRegistry
+        run: |
+          julia -e '
+            using Pkg
+            Pkg.Registry.add(RegistrySpec(url="https://github.com/legend-exp/LegendJuliaRegistry"))
+            Pkg.Registry.add("General")
+          '
+
+      - name: Verify GPU
+        run: nvidia-smi
+
+      - name: Install dependencies
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run simulation
+        run: julia --project=. --threads=auto scripts/run_simulation.jl
+
+      - name: Generate plots
+        run: julia --project=. scripts/plot_results.jl
+        env:
+          CI: "true"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-results-gpu
+          path: output/
+          retention-days: 30
+
+      - name: Clean workspace
+        if: always()
+        run: rm -rf output/*.jld2
+
+  simulate-cpu:
+    name: Simulate (CPU fallback)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 120
+
+    env:
+      JULIA_NUM_THREADS: 4
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - name: Cache Julia packages
+        uses: julia-actions/cache@v3
+
+      - name: Add LegendJuliaRegistry
+        run: |
+          julia -e '
+            using Pkg
+            Pkg.Registry.add(RegistrySpec(url="https://github.com/legend-exp/LegendJuliaRegistry"))
+            Pkg.Registry.add("General")
+          '
+
+      - name: Install dependencies
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run simulation
+        run: julia --project=. --threads=auto scripts/run_simulation.jl
+
+      - name: Generate plots
+        run: julia --project=. scripts/plot_results.jl
+        env:
+          CI: "true"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-results-cpu
+          path: output/
+          retention-days: 30
+
+      - name: Clean workspace
+        if: always()
+        run: rm -rf output/*.jld2
