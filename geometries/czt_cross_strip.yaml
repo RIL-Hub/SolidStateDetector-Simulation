@@ -1,4 +1,4 @@
-name: CZT Cross-Strip Detector
+name: CZT Strip Detector
 
 units:
   length: mm
@@ -10,82 +10,141 @@ grid:
   coordinates: cartesian
   axes:
     x:
-      from: -10
-      to: 10
+      from: -22
+      to: 22
       boundaries:
         left: reflecting
         right: reflecting
     y:
-      from: -10
-      to: 10
+      from: -22
+      to: 22
       boundaries:
         left: reflecting
         right: reflecting
     z:
-      from: 0
-      to: 10
+      from: -4
+      to: 4
       boundaries:
-        left: fixed
-        right: fixed
+        left: reflecting
+        right: reflecting
 
 medium: vacuum
 
 detectors:
   - semiconductor:
       material: CdZnTe
-      temperature: 300
+      temperature: 293
       geometry:
         box:
-          widths: [20, 20, 10]
-          origin: [0, 0, 5]
+          widths: [40, 40, 5]
+      impurity_density:
+        name: constant
+        value: 0
 
     contacts:
-      # Cathode - full planar electrode on top at z=10
+      # ── Anode strips (z = +2.5 mm, top face) ──
+      # 5 strips along x-axis, 100 μm wide, 1 mm pitch, 0 V
+
       - id: 1
-        potential: -1000
+        potential: 0
         geometry:
           box:
-            hX: 10
-            hY: 10
+            hX: 0.05
+            hY: 20
             hZ: 0
-            origin: [0, 0, 10]
+            origin: [-2, 0, 2.5]
 
-      # Anode strip 1 - bottom, centered at y = -7.5
       - id: 2
         potential: 0
         geometry:
           box:
-            hX: 10
-            hY: 1.5
+            hX: 0.05
+            hY: 20
             hZ: 0
-            origin: [0, -7.5, 0]
+            origin: [-1, 0, 2.5]
 
-      # Anode strip 2 - bottom, centered at y = -2.5
       - id: 3
         potential: 0
         geometry:
           box:
-            hX: 10
-            hY: 1.5
+            hX: 0.05
+            hY: 20
             hZ: 0
-            origin: [0, -2.5, 0]
+            origin: [0, 0, 2.5]
 
-      # Anode strip 3 - bottom, centered at y = 2.5
       - id: 4
         potential: 0
         geometry:
           box:
-            hX: 10
-            hY: 1.5
+            hX: 0.05
+            hY: 20
             hZ: 0
-            origin: [0, 2.5, 0]
+            origin: [1, 0, 2.5]
 
-      # Anode strip 4 - bottom, centered at y = 7.5
       - id: 5
         potential: 0
         geometry:
           box:
-            hX: 10
-            hY: 1.5
+            hX: 0.05
+            hY: 20
             hZ: 0
-            origin: [0, 7.5, 0]
+            origin: [2, 0, 2.5]
+
+      # ── Steering electrode (z = +2.5 mm, top face) ──
+      # 6 strips, 400 μm wide, -80 V, single electrical contact
+
+      - id: 6
+        potential: -80
+        geometry:
+          union:
+            - box:
+                hX: 0.2
+                hY: 20
+                hZ: 0
+                origin: [-2.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20
+                hZ: 0
+                origin: [-1.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20
+                hZ: 0
+                origin: [-0.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20
+                hZ: 0
+                origin: [0.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20
+                hZ: 0
+                origin: [1.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20
+                hZ: 0
+                origin: [2.5, 0, 2.5]
+
+      # ── Cathode strips (z = -2.5 mm, bottom face) ──
+      # 2 strips along y-axis, 4.9 mm wide, 100 μm gap at y=0, -600 V
+
+      - id: 7
+        potential: -600
+        geometry:
+          box:
+            hX: 20
+            hY: 2.45
+            hZ: 0
+            origin: [0, -2.5, -2.5]
+
+      - id: 8
+        potential: -600
+        geometry:
+          box:
+            hX: 20
+            hY: 2.45
+            hZ: 0
+            origin: [0, 2.5, -2.5]
