@@ -1,9 +1,13 @@
 #!/usr/bin/env julia
 """
-Full CZT cross-strip detector simulation benchmark.
+Full CZT strip detector simulation benchmark.
 Computes electric potential, field, weighting potentials, and simulates
 a photon interaction with charge drift and signal induction.
 Outputs an interactive HTML report for GitHub Pages.
+
+Geometry: 40×40×5 mm CdZnTe crystal
+  Anode face (z=+2.5): 5 anode strips (100 μm, 0V) + steering electrode (6×400 μm, -80V)
+  Cathode face (z=-2.5): 2 cathode strips (4.9 mm, -600V)
 """
 
 using Dates
@@ -17,7 +21,7 @@ function js_array(arr)
     print(io, "[")
     for (i, v) in enumerate(arr)
         i > 1 && print(io, ",")
-        if isnan(v)
+        if isnan(v) || isinf(v)
             print(io, "null")
         else
             print(io, Float64(v))
@@ -28,7 +32,6 @@ function js_array(arr)
 end
 
 function js_heatmap_z(mat)
-    # mat[ix, iz] → Plotly z[iz][ix]
     rows = String[]
     for j in axes(mat, 2)
         push!(rows, js_array(mat[:, j]))
@@ -102,8 +105,10 @@ println("$(round(t_field; digits=2))s")
 
 # ── Phase 5: Weighting potentials ────────────────────────────────────────────
 
-print("Weighting potentials … ")
+n_contacts = length(sim.detector.contacts)
+print("Weighting potentials ($n_contacts contacts) … ")
 t_wp = @elapsed for contact in sim.detector.contacts
+    print("$(contact.id) ")
     calculate_weighting_potential!(sim, contact.id;
         refinement_limits = [0.2, 0.1, 0.05],
         convergence_limit = 1e-6,
@@ -113,15 +118,17 @@ println("$(round(t_wp; digits=2))s")
 
 # ── Phase 6: Charge drift ───────────────────────────────────────────────────
 
-# Interaction at (0, 2.5, 5) mm — directly above anode strip 3 (contact 4)
-interaction_mm = (0.0, 2.5, 5.0)
+# Interaction at (0, 0, 0) mm — center of crystal,
+# directly below center anode (contact 3, x=0, z=+2.5)
+# and above cathodes (z=-2.5)
+interaction_mm = (0.0, 0.0, 0.0)
 interaction_m  = Float32.(interaction_mm ./ 1000)
 println("\nSimulating photon at ($(interaction_mm[1]), $(interaction_mm[2]), $(interaction_mm[3])) mm …")
 
 evt = Event(CartesianPoint{Float32}(interaction_m...))
 drift_stats = @timed simulate!(evt, sim;
     Δt = 1u"ns",
-    max_nsteps = 5000,
+    max_nsteps = 10000,
 )
 println("  Drift + signals: $(round(drift_stats.time; digits=2))s")
 
@@ -136,26 +143,43 @@ x_mm = Float64.(ep.grid.x.ticks .* 1000)
 y_mm = Float64.(ep.grid.y.ticks .* 1000)
 z_mm = Float64.(ep.grid.z.ticks .* 1000)
 
-# XZ slice at y closest to 2.5 mm
-iy = argmin(abs.(ep.grid.y.ticks .- 0.0025f0))
+# XZ slice at y=0 (through center)
+iy = argmin(abs.(ep.grid.y.ticks))
 slice_xz = Float64.(ep.data[:, iy, :])
 
-# XY slice at z closest to 5 mm
-iz = argmin(abs.(ep.grid.z.ticks .- 0.005f0))
-slice_xy = Float64.(ep.data[:, :, iz])
+# XY slice near anode face (z ≈ 2.3 mm) — shows lateral field from strip pattern
+iz_anode = argmin(abs.(ep.grid.z.ticks .- 0.0023f0))
+slice_xy = Float64.(ep.data[:, :, iz_anode])
 
-# Weighting potential for contact 4 (primary collecting anode)
-wp4 = sim.weighting_potentials[4]
-wp4_x_mm = Float64.(wp4.grid.x.ticks .* 1000)
-wp4_z_mm = Float64.(wp4.grid.z.ticks .* 1000)
-wp4_iy = argmin(abs.(wp4.grid.y.ticks .- 0.0025f0))
-wp4_slice = Float64.(wp4.data[:, wp4_iy, :])
+# Weighting potential for contact 3 (center anode, primary collecting electrode)
+wp3 = sim.weighting_potentials[3]
+wp3_x_mm = Float64.(wp3.grid.x.ticks .* 1000)
+wp3_z_mm = Float64.(wp3.grid.z.ticks .* 1000)
+wp3_iy = argmin(abs.(wp3.grid.y.ticks))
+wp3_slice = Float64.(wp3.data[:, wp3_iy, :])
 
 # ── Extract waveform data ────────────────────────────────────────────────────
 
-contact_names = ["Cathode", "Anode 1 (y=-7.5)", "Anode 2 (y=-2.5)",
-                 "Anode 3 (y=2.5)", "Anode 4 (y=7.5)"]
-contact_colors = ["#e74c3c", "#2ecc71", "#3498db", "#f39c12", "#9b59b6"]
+contact_names = [
+    "Anode 1 (x=-2)",     # ID 1
+    "Anode 2 (x=-1)",     # ID 2
+    "Anode 3 (x=0)",      # ID 3  ← primary
+    "Anode 4 (x=+1)",     # ID 4
+    "Anode 5 (x=+2)",     # ID 5
+    "Steering (-80V)",    # ID 6
+    "Cathode 1 (y=-2.5)", # ID 7
+    "Cathode 2 (y=+2.5)", # ID 8
+]
+contact_colors = [
+    "#27ae60",  # anode 1 - green
+    "#2ecc71",  # anode 2 - light green
+    "#e74c3c",  # anode 3 - red (primary, highlighted)
+    "#3498db",  # anode 4 - blue
+    "#2980b9",  # anode 5 - dark blue
+    "#f39c12",  # steering - orange
+    "#8e44ad",  # cathode 1 - purple
+    "#9b59b6",  # cathode 2 - light purple
+]
 
 charge_traces = String[]
 current_traces = String[]
@@ -171,7 +195,7 @@ for (idx, wf) in enumerate(evt.waveforms)
       x: $(js_array(t_ns)), y: $(js_array(sig)),
       type:'scatter', mode:'lines',
       name:'$(contact_names[idx])',
-      line:{color:'$(contact_colors[idx])'}
+      line:{color:'$(contact_colors[idx])', width:$(idx == 3 ? 3 : 1.5)}
     }""")
 
     # Induced current (numerical derivative)
@@ -183,7 +207,7 @@ for (idx, wf) in enumerate(evt.waveforms)
           x: $(js_array(t_mid)), y: $(js_array(current)),
           type:'scatter', mode:'lines',
           name:'$(contact_names[idx])',
-          line:{color:'$(contact_colors[idx])'}
+          line:{color:'$(contact_colors[idx])', width:$(idx == 3 ? 3 : 1.5)}
         }""")
     end
 end
@@ -226,12 +250,43 @@ function fmt_bytes(b)
     return "$b B"
 end
 
+# 3D geometry traces — strip widths exaggerated 5× for visibility
+geo_traces = String[]
+# Crystal
+push!(geo_traces, box_trace(0, 0, 0, 20, 20, 2.5; color="#4a90d9", opacity=0.08, name="CdZnTe Crystal (40×40×5 mm)"))
+# Anode strips (100μm → shown as 0.5mm for visibility)
+anode_xs = [-2.0, -1.0, 0.0, 1.0, 2.0]
+for (i, ax) in enumerate(anode_xs)
+    push!(geo_traces, box_trace(ax, 0, 2.5, 0.25, 5, 0.08;
+        color=(i == 3 ? "#e74c3c" : "#27ae60"), opacity=0.85,
+        name="Anode $i (x=$(ax)mm, 0V)"))
+end
+# Steering strips (400μm, shown at scale)
+steer_xs = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]
+for (i, sx) in enumerate(steer_xs)
+    push!(geo_traces, box_trace(sx, 0, 2.5, 0.2, 5, 0.06;
+        color="#f39c12", opacity=0.7,
+        name=(i == 1 ? "Steering (-80V)" : "")))
+end
+# Cathode strips
+push!(geo_traces, box_trace(0, -2.5, -2.5, 20, 2.45, 0.08; color="#8e44ad", opacity=0.6, name="Cathode 1 (-600V)"))
+push!(geo_traces, box_trace(0,  2.5, -2.5, 20, 2.45, 0.08; color="#9b59b6", opacity=0.6, name="Cathode 2 (-600V)"))
+# Interaction point
+push!(geo_traces, """{
+  type:'scatter3d', mode:'markers',
+  x:[$(interaction_mm[1])], y:[$(interaction_mm[2])], z:[$(interaction_mm[3])],
+  marker:{size:8, color:'red', symbol:'diamond'},
+  name:'Photon (0, 0, 0) mm'
+}""")
+
+geo_traces_js = join(geo_traces, ",\n")
+
 html = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CZT Simulation Report</title>
+<title>CZT Strip Detector — Simulation Report</title>
 <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
 <style>
   * { box-sizing: border-box; }
@@ -240,11 +295,14 @@ html = """<!DOCTYPE html>
   h1 { font-size: 1.5em; border-bottom: 3px solid #2c3e50; padding-bottom: 8px; margin-bottom: 4px; }
   .subtitle { color: #666; margin-bottom: 24px; }
   h2 { font-size: 1.15em; margin-top: 32px; color: #2c3e50; }
+  .note { font-size: 0.85em; color: #888; margin-top: 4px; }
   table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; }
   th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid #dee2e6; }
   th { background: #e9ecef; font-weight: 600; width: 40%; }
   .val { font-family: "SF Mono", Menlo, monospace; font-size: 0.95em; }
   .time { color: #0366d6; font-weight: 600; }
+  .geom-table th { width: 30%; }
+  .geom-table td { font-family: "SF Mono", Menlo, monospace; font-size: 0.9em; }
   .plot-row { display: flex; gap: 16px; flex-wrap: wrap; }
   .plot-row > div { flex: 1; min-width: 400px; }
   .plot-box { background: #fff; border: 1px solid #dee2e6; border-radius: 6px;
@@ -255,9 +313,18 @@ html = """<!DOCTYPE html>
 </head>
 <body>
 
-<h1>CZT Cross-Strip Detector &mdash; Simulation Report</h1>
+<h1>CZT Strip Detector &mdash; Simulation Report</h1>
 <p class="subtitle">Photon interaction at ($(interaction_mm[1]), $(interaction_mm[2]), $(interaction_mm[3])) mm
 &bull; $(timestamp)</p>
+
+<h2>Detector Geometry</h2>
+<table class="geom-table">
+<tr><th>Crystal</th><td>CdZnTe, 40 &times; 40 &times; 5 mm, 293 K</td></tr>
+<tr><th>Anodes (IDs 1–5)</th><td>5 strips, 100 &mu;m wide, 1 mm pitch, x = -2…+2 mm, z = +2.5 mm, 0 V</td></tr>
+<tr><th>Steering (ID 6)</th><td>6 strips, 400 &mu;m wide, x = -2.5…+2.5 mm, z = +2.5 mm, -80 V</td></tr>
+<tr><th>Cathodes (IDs 7–8)</th><td>2 strips, 40 &times; 4.9 mm, 100 &mu;m gap at y=0, z = -2.5 mm, -600 V</td></tr>
+<tr><th>Bulk field</th><td>~1200 V/cm (cathode &rarr; anode)</td></tr>
+</table>
 
 <h2>System &amp; Benchmark</h2>
 <table>
@@ -270,13 +337,14 @@ html = """<!DOCTYPE html>
 <tr><th>Geometry parse</th><td class="val time">$(fmt_time(t_geom))</td></tr>
 <tr><th>Electric potential</th><td class="val time">$(fmt_time(pot_stats.time)) &bull; $(fmt_bytes(pot_stats.bytes)) alloc &bull; $(fmt_time(pot_stats.gctime)) GC</td></tr>
 <tr><th>Electric field</th><td class="val time">$(fmt_time(t_field))</td></tr>
-<tr><th>Weighting potentials (5)</th><td class="val time">$(fmt_time(t_wp))</td></tr>
+<tr><th>Weighting potentials ($n_contacts)</th><td class="val time">$(fmt_time(t_wp))</td></tr>
 <tr><th>Charge drift + signals</th><td class="val time">$(fmt_time(drift_stats.time))</td></tr>
 <tr><th>Total</th><td class="val time" style="font-size:1.1em">$(fmt_time(t_total))</td></tr>
 </table>
 
 <h2>3D Detector Geometry</h2>
-<div class="plot-box"><div id="geo3d" style="height:500px"></div></div>
+<p class="note">Anode strip widths exaggerated 5&times; for visibility. Drag to rotate, scroll to zoom.</p>
+<div class="plot-box"><div id="geo3d" style="height:550px"></div></div>
 
 <h2>Electric Potential</h2>
 <div class="plot-row">
@@ -284,14 +352,15 @@ html = """<!DOCTYPE html>
   <div class="plot-box"><div id="pot_xy" style="height:400px"></div></div>
 </div>
 
-<h2>Weighting Potential &mdash; Anode 3 (Contact 4)</h2>
-<div class="plot-box"><div id="wp4" style="height:400px"></div></div>
+<h2>Weighting Potential &mdash; Center Anode (Contact 3, x=0)</h2>
+<div class="plot-box"><div id="wp3" style="height:400px"></div></div>
 
 <h2>Induced Current</h2>
-<div class="plot-box"><div id="current" style="height:400px"></div></div>
+<p class="note">Numerical derivative of induced charge. Center anode (red) is the primary collecting electrode.</p>
+<div class="plot-box"><div id="current" style="height:450px"></div></div>
 
 <h2>Induced Charge</h2>
-<div class="plot-box"><div id="charge" style="height:400px"></div></div>
+<div class="plot-box"><div id="charge" style="height:450px"></div></div>
 
 <footer>Generated $(timestamp) &bull; SolidStateDetectors.jl</footer>
 
@@ -299,69 +368,67 @@ html = """<!DOCTYPE html>
 var cfg = {responsive: true, displaylogo: false};
 
 // ── 3D Geometry ──
-Plotly.newPlot('geo3d', [
-  $(box_trace(0, 0, 5, 10, 10, 5; color="#4a90d9", opacity=0.12, name="CdZnTe Crystal")),
-  $(box_trace(0, 0, 10, 10, 10, 0.15; color="#e74c3c", opacity=0.7, name="Cathode (-1000V)")),
-  $(box_trace(0, -7.5, 0, 10, 1.5, 0.15; color="#2ecc71", opacity=0.7, name="Anode 1")),
-  $(box_trace(0, -2.5, 0, 10, 1.5, 0.15; color="#3498db", opacity=0.7, name="Anode 2")),
-  $(box_trace(0, 2.5, 0, 10, 1.5, 0.15; color="#f39c12", opacity=0.7, name="Anode 3")),
-  $(box_trace(0, 7.5, 0, 10, 1.5, 0.15; color="#9b59b6", opacity=0.7, name="Anode 4")),
-  {type:'scatter3d', mode:'markers', x:[$(interaction_mm[1])], y:[$(interaction_mm[2])], z:[$(interaction_mm[3])],
-   marker:{size:8, color:'red', symbol:'diamond'}, name:'Photon interaction'}
-], {
+Plotly.newPlot('geo3d', [$(geo_traces_js)], {
   scene: {
-    xaxis:{title:'x (mm)'}, yaxis:{title:'y (mm)'}, zaxis:{title:'z (mm)'},
-    camera:{eye:{x:1.5, y:1.5, z:1.0}},
+    xaxis:{title:'x (mm)', range:[-5, 5]},
+    yaxis:{title:'y (mm)', range:[-6, 6]},
+    zaxis:{title:'z (mm)'},
+    camera:{eye:{x:1.8, y:0.8, z:0.9}},
     aspectmode:'data'
   },
-  margin:{l:0,r:0,t:30,b:0}, title:'CZT Cross-Strip Detector'
+  margin:{l:0,r:0,t:30,b:0},
+  title:'CZT Strip Detector — Electrode Layout',
+  showlegend:true, legend:{x:0.01, y:0.99}
 }, cfg);
 
-// ── Electric Potential XZ ──
+// ── Electric Potential XZ (y=0) ──
 Plotly.newPlot('pot_xz', [{
   type:'heatmap',
   x: $(js_array(x_mm)),
   y: $(js_array(z_mm)),
   z: $(js_heatmap_z(slice_xz)),
   colorscale:'RdBu', reversescale:true,
-  colorbar:{title:'V'}
+  colorbar:{title:'V'},
+  hovertemplate:'x: %{x:.1f} mm<br>z: %{y:.1f} mm<br>V: %{z:.1f}<extra></extra>'
 }], {
-  title:'Electric Potential (y = $(round(y_mm[iy]; digits=1)) mm)',
+  title:'Electric Potential (y = 0 mm)',
   xaxis:{title:'x (mm)'}, yaxis:{title:'z (mm)'},
   margin:{t:40,b:50,l:60,r:20}
 }, cfg);
 
-// ── Electric Potential XY ──
+// ── Electric Potential XY (near anode face) ──
 Plotly.newPlot('pot_xy', [{
   type:'heatmap',
   x: $(js_array(x_mm)),
   y: $(js_array(y_mm)),
   z: $(js_heatmap_z(slice_xy)),
   colorscale:'RdBu', reversescale:true,
-  colorbar:{title:'V'}
+  colorbar:{title:'V'},
+  hovertemplate:'x: %{x:.1f} mm<br>y: %{y:.1f} mm<br>V: %{z:.1f}<extra></extra>'
 }], {
-  title:'Electric Potential (z = $(round(z_mm[iz]; digits=1)) mm)',
+  title:'Electric Potential (z ≈ $(round(z_mm[iz_anode]; digits=1)) mm, near anode face)',
   xaxis:{title:'x (mm)'}, yaxis:{title:'y (mm)'},
   margin:{t:40,b:50,l:60,r:20}
 }, cfg);
 
-// ── Weighting Potential Contact 4 ──
-Plotly.newPlot('wp4', [{
+// ── Weighting Potential — Center Anode ──
+Plotly.newPlot('wp3', [{
   type:'heatmap',
-  x: $(js_array(wp4_x_mm)),
-  y: $(js_array(wp4_z_mm)),
-  z: $(js_heatmap_z(wp4_slice)),
+  x: $(js_array(wp3_x_mm)),
+  y: $(js_array(wp3_z_mm)),
+  z: $(js_heatmap_z(wp3_slice)),
   colorscale:'Viridis',
-  colorbar:{title:'W.P.'}
+  colorbar:{title:'W.P.'},
+  hovertemplate:'x: %{x:.2f} mm<br>z: %{y:.2f} mm<br>WP: %{z:.3f}<extra></extra>'
 }], {
-  title:'Weighting Potential — Anode 3 (y = $(round(Float64(wp4.grid.y.ticks[wp4_iy]) * 1000; digits=1)) mm)',
+  title:'Weighting Potential — Anode 3 (y = 0 mm)',
   xaxis:{title:'x (mm)'}, yaxis:{title:'z (mm)'},
   margin:{t:40,b:50,l:60,r:20}
 }, cfg);
 
 // ── Induced Current ──
 Plotly.newPlot('current', [$(join(current_traces, ",\n"))], {
-  title:'Induced Current',
+  title:'Induced Current (dQ/dt)',
   xaxis:{title:'Time (ns)'}, yaxis:{title:'dQ/dt (a.u./ns)'},
   margin:{t:40,b:50,l:70,r:20},
   hovermode:'x unified'
