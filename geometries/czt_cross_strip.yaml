@@ -40,6 +40,11 @@ detectors:
       impurity_density:
         name: constant
         value: 0
+      charge_trapping_model:
+        model: ConstantLifetime
+        parameters:
+          τe: 1μs
+          τh: 50ns
 
     contacts:
       # ── Anode strips (z = +2.5 mm, top face) ──
