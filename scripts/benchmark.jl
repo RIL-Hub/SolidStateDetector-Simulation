@@ -118,10 +118,10 @@ println("$(round(t_wp; digits=2))s")
 
 # ── Phase 6: Charge drift ───────────────────────────────────────────────────
 
-# Interaction at (0, 0, 0) mm — center of crystal,
+# Interaction at (0, 2.5, 0) mm — center of crystal,
 # directly below center anode (contact 3, x=0, z=+2.5)
-# and above cathodes (z=-2.5)
-interaction_mm = (0.0, 0.0, 0.0)
+# and centered over cathode 2 (y=+2.5, z=-2.5)
+interaction_mm = (0.0, 2.5, 0.0)
 interaction_m  = Float32.(interaction_mm ./ 1000)
 println("\nSimulating photon at ($(interaction_mm[1]), $(interaction_mm[2]), $(interaction_mm[3])) mm …")
 
@@ -143,8 +143,8 @@ x_mm = Float64.(ep.grid.x.ticks .* 1000)
 y_mm = Float64.(ep.grid.y.ticks .* 1000)
 z_mm = Float64.(ep.grid.z.ticks .* 1000)
 
-# XZ slice at y=0 (through center)
-iy = argmin(abs.(ep.grid.y.ticks))
+# XZ slice at y=2.5mm (through interaction point, over cathode 2)
+iy = argmin(abs.(ep.grid.y.ticks .- 0.0025f0))
 slice_xz = Float64.(ep.data[:, iy, :])
 
 # XY slice near anode face (z ≈ 2.3 mm) — shows lateral field from strip pattern
@@ -155,7 +155,7 @@ slice_xy = Float64.(ep.data[:, :, iz_anode])
 wp3 = sim.weighting_potentials[3]
 wp3_x_mm = Float64.(wp3.grid.x.ticks .* 1000)
 wp3_z_mm = Float64.(wp3.grid.z.ticks .* 1000)
-wp3_iy = argmin(abs.(wp3.grid.y.ticks))
+wp3_iy = argmin(abs.(wp3.grid.y.ticks .- 0.0025f0))
 wp3_slice = Float64.(wp3.data[:, wp3_iy, :])
 
 # ── Extract waveform data ────────────────────────────────────────────────────
@@ -250,18 +250,18 @@ function fmt_bytes(b)
     return "$b B"
 end
 
-# 3D geometry traces — strip widths exaggerated 5× for visibility
+# 3D geometry traces — true proportional electrode widths
 geo_traces = String[]
 # Crystal
 push!(geo_traces, box_trace(0, 0, 0, 20, 20, 2.5; color="#4a90d9", opacity=0.08, name="CdZnTe Crystal (40×40×5 mm)"))
-# Anode strips (100μm → shown as 0.5mm for visibility)
+# Anode strips — true scale: hX=0.05 mm (100 μm total width)
 anode_xs = [-2.0, -1.0, 0.0, 1.0, 2.0]
 for (i, ax) in enumerate(anode_xs)
-    push!(geo_traces, box_trace(ax, 0, 2.5, 0.25, 5, 0.08;
-        color=(i == 3 ? "#e74c3c" : "#27ae60"), opacity=0.85,
+    push!(geo_traces, box_trace(ax, 0, 2.5, 0.05, 5, 0.08;
+        color=(i == 3 ? "#e74c3c" : "#27ae60"), opacity=0.9,
         name="Anode $i (x=$(ax)mm, 0V)"))
 end
-# Steering strips (400μm, shown at scale)
+# Steering strips — true scale: hX=0.2 mm (400 μm total width, 4× wider than anodes)
 steer_xs = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5]
 for (i, sx) in enumerate(steer_xs)
     push!(geo_traces, box_trace(sx, 0, 2.5, 0.2, 5, 0.06;
@@ -276,7 +276,7 @@ push!(geo_traces, """{
   type:'scatter3d', mode:'markers',
   x:[$(interaction_mm[1])], y:[$(interaction_mm[2])], z:[$(interaction_mm[3])],
   marker:{size:8, color:'red', symbol:'diamond'},
-  name:'Photon (0, 0, 0) mm'
+  name:'Photon ($(interaction_mm[1]), $(interaction_mm[2]), $(interaction_mm[3])) mm'
 }""")
 
 geo_traces_js = join(geo_traces, ",\n")
@@ -343,7 +343,7 @@ html = """<!DOCTYPE html>
 </table>
 
 <h2>3D Detector Geometry</h2>
-<p class="note">Anode strip widths exaggerated 5&times; for visibility. Drag to rotate, scroll to zoom.</p>
+<p class="note">Electrode widths at true proportional scale: anodes 100 &mu;m, steering 400 &mu;m (4&times; wider). Drag to rotate, scroll to zoom.</p>
 <div class="plot-box"><div id="geo3d" style="height:550px"></div></div>
 
 <h2>Electric Potential</h2>
@@ -391,7 +391,7 @@ Plotly.newPlot('pot_xz', [{
   colorbar:{title:'V'},
   hovertemplate:'x: %{x:.1f} mm<br>z: %{y:.1f} mm<br>V: %{z:.1f}<extra></extra>'
 }], {
-  title:'Electric Potential (y = 0 mm)',
+  title:'Electric Potential (y = $(round(y_mm[iy]; digits=1)) mm)',
   xaxis:{title:'x (mm)'}, yaxis:{title:'z (mm)'},
   margin:{t:40,b:50,l:60,r:20}
 }, cfg);
@@ -421,7 +421,7 @@ Plotly.newPlot('wp3', [{
   colorbar:{title:'W.P.'},
   hovertemplate:'x: %{x:.2f} mm<br>z: %{y:.2f} mm<br>WP: %{z:.3f}<extra></extra>'
 }], {
-  title:'Weighting Potential — Anode 3 (y = 0 mm)',
+  title:'Weighting Potential — Anode 3 (y = $(round(Float64(wp3.grid.y.ticks[wp3_iy]) * 1000; digits=1)) mm)',
   xaxis:{title:'x (mm)'}, yaxis:{title:'z (mm)'},
   margin:{t:40,b:50,l:60,r:20}
 }, cfg);
