@@ -1,12 +1,6 @@
 name: Benchmark → Pages
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/benchmark.jl'
-      - 'geometries/**'
-      - 'Project.toml'
   workflow_dispatch:
 
 permissions:
