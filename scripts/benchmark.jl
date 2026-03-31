@@ -22,7 +22,7 @@ const INTERACTION_X   = 0.1               # mm (near center anode 3)
 const INTERACTION_Y   = 2.5               # mm (centered over cathode 2)
 const Z_FROM_CATHODE  = collect(0.5:0.5:4.5)  # mm, 9 depths
 const Z_SIM           = Z_FROM_CATHODE .- 2.5  # mm, in simulation coords
-const DT_NS           = 1                 # ns
+const DT_NS           = 0.5               # ns
 const MAX_NSTEPS      = 20000
 const DETAIL_Z_IDX    = 5                 # center depth for detailed event
 
