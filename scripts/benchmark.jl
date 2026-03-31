@@ -19,7 +19,7 @@ sys = Dict{String,Any}(
 )
 
 println("── System ─────────────────────────────────────")
-for (k, v) in sort(collect(sys))
+for (k, v) in sort(collect(sys); by=first)
     println("  $k: $v")
 end
 
@@ -53,14 +53,14 @@ metrics = merge(sys, Dict{String,Any}(
 ))
 
 println("\n── Metrics ────────────────────────────────────")
-for (k, v) in sort(collect(metrics))
+for (k, v) in sort(collect(metrics); by=first)
     println("  $k: $v")
 end
 
 # ── Write JSON ───────────────────────────────────────────────────────────────
 function simple_json(d::Dict)
     entries = String[]
-    for (k, v) in sort(collect(d))
+    for (k, v) in sort(collect(d); by=first)
         val = v isa AbstractString ? "\"$(escape_string(v))\"" : string(v)
         push!(entries, "  \"$k\": $val")
     end
