@@ -22,14 +22,14 @@ const INTERACTION_X   = 0.1               # mm (near center anode 3)
 const INTERACTION_Y   = 2.5               # mm (centered over cathode 2)
 const Z_FROM_CATHODE  = collect(0.5:0.5:4.5)  # mm, 9 depths
 const Z_SIM           = Z_FROM_CATHODE .- 2.5  # mm, in simulation coords
-const DT_NS           = 0.5               # ns
-const MAX_NSTEPS      = 40000             # 20 μs — enough for full hole drift
+const DT_NS           = 0.1               # ns — fine resolution near interaction
+const MAX_NSTEPS      = 50000             # 5 μs window
 const DETAIL_Z_IDX    = 5                 # center depth for detailed event
 
 const PREAMP_B0       = 1400.0            # gain
 const PREAMP_A1       = 0.99999285714285714  # pole (τ ≈ 70 μs decay)
-const PREAMP_DISPLAY_US = 40.0            # show 40 μs of preamp output
-const PREAMP_SUBSAMPLE = 20               # display every 20th sample (10 ns)
+const PREAMP_DISPLAY_US = 5.0             # show 5 μs of preamp output
+const PREAMP_SUBSAMPLE = 5                # display every 5th sample (0.5 ns)
 
 # Contacts of interest
 const CENTER_ANODE    = 3                 # primary collecting pixel
