@@ -17,7 +17,7 @@ jobs:
   benchmark:
     name: Run benchmark
     runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     env:
       JULIA_NUM_THREADS: auto
