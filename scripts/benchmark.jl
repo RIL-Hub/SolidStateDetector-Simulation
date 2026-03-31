@@ -23,11 +23,13 @@ const INTERACTION_Y   = 2.5               # mm (centered over cathode 2)
 const Z_FROM_CATHODE  = collect(0.5:0.5:4.5)  # mm, 9 depths
 const Z_SIM           = Z_FROM_CATHODE .- 2.5  # mm, in simulation coords
 const DT_NS           = 0.5               # ns
-const MAX_NSTEPS      = 20000
+const MAX_NSTEPS      = 40000             # 20 μs — enough for full hole drift
 const DETAIL_Z_IDX    = 5                 # center depth for detailed event
 
 const PREAMP_B0       = 1400.0            # gain
-const PREAMP_A1       = 0.99999285714285714  # pole (slow decay)
+const PREAMP_A1       = 0.99999285714285714  # pole (τ ≈ 70 μs decay)
+const PREAMP_DISPLAY_US = 40.0            # show 40 μs of preamp output
+const PREAMP_SUBSAMPLE = 20               # display every 20th sample (10 ns)
 
 # Contacts of interest
 const CENTER_ANODE    = 3                 # primary collecting pixel
@@ -82,13 +84,24 @@ function depth_color(t)
     return "rgb($r,$g,$b)"
 end
 
-function apply_preamp(current, b0, a1)
-    out = similar(current)
-    out[1] = b0 * current[1]
-    for i in 2:length(current)
-        out[i] = b0 * current[i] + a1 * out[i-1]
+function apply_preamp(current, dt_ns, b0, a1; display_us=40.0, subsample=20)
+    # Apply IIR preamp filter: y[n] = b0*x[n] + a1*y[n-1]
+    # Pad input with zeros to show the long exponential decay
+    n_pad = round(Int, display_us * 1000 / dt_ns)  # total samples for display window
+    n_in = length(current)
+    n_total = max(n_in, n_pad)
+
+    out = zeros(Float64, n_total)
+    out[1] = b0 * (1 <= n_in ? current[1] : 0.0)
+    for i in 2:n_total
+        x = i <= n_in ? current[i] : 0.0
+        out[i] = b0 * x + a1 * out[i-1]
     end
-    return out
+
+    # Subsample for display
+    idx = 1:subsample:n_total
+    t_out = Float64.(collect(idx) .- 1) .* dt_ns
+    return t_out, out[idx]
 end
 
 function fmt_time(s)
@@ -160,8 +173,10 @@ println("$(round(t_wp; digits=2))s")
 
 println("\n── Z-Scan: $(length(Z_SIM)) depths, x=$(INTERACTION_X)mm, y=$(INTERACTION_Y)mm ──")
 
-# zscan_current[contact_id][z_idx] = (t_ns, current)
+# zscan_current[contact_id][z_idx] = (t_ns, current)  — raw induced current
+# zscan_preamp[contact_id][z_idx]  = (t_ns, shaped)   — after preamp filter
 zscan_current = Dict{Int, Vector{Tuple{Vector{Float64}, Vector{Float64}}}}()
+zscan_preamp  = Dict{Int, Vector{Tuple{Vector{Float64}, Vector{Float64}}}}()
 zscan_charge  = Dict{Int, Vector{Tuple{Vector{Float64}, Vector{Float64}}}}()
 zscan_events  = Vector{Any}(nothing, length(Z_SIM))
 
@@ -185,9 +200,15 @@ t_zscan = @elapsed for (zi, z_mm) in enumerate(Z_SIM)
         cur = diff(sig) ./ dt
         t_mid = t_ns[1:end-1] .+ dt/2
 
+        # Apply charge-sensitive preamp (IIR filter with long decay)
+        t_pre, sig_pre = apply_preamp(cur, DT_NS, PREAMP_B0, PREAMP_A1;
+            display_us=PREAMP_DISPLAY_US, subsample=PREAMP_SUBSAMPLE)
+
         haskey(zscan_current, cid) || (zscan_current[cid] = [])
+        haskey(zscan_preamp, cid)  || (zscan_preamp[cid]  = [])
         haskey(zscan_charge, cid)  || (zscan_charge[cid]  = [])
         push!(zscan_current[cid], (t_mid, cur))
+        push!(zscan_preamp[cid],  (t_pre, sig_pre))
         push!(zscan_charge[cid],  (t_ns, sig))
     end
 end
@@ -291,12 +312,12 @@ zscan_panels = [
 zscan_panel_traces = Dict{Int, String}()
 for (cid, _title) in zscan_panels
     traces = String[]
-    if haskey(zscan_current, cid)
-        for (zi, (t, cur)) in enumerate(zscan_current[cid])
+    if haskey(zscan_preamp, cid)
+        for (zi, (t, shaped)) in enumerate(zscan_preamp[cid])
             frac = (zi - 1) / max(length(Z_SIM) - 1, 1)
             col = depth_color(frac)
             lbl = "z=$(Z_FROM_CATHODE[zi])mm"
-            push!(traces, """{x:$(js_array(t)),y:$(js_array(cur)),
+            push!(traces, """{x:$(js_array(t)),y:$(js_array(shaped)),
               type:'scatter',mode:'lines',name:'$lbl',
               line:{color:'$col',width:1.5},showlegend:$(zi==1 ? "true" : "false")}""")
         end
@@ -304,7 +325,7 @@ for (cid, _title) in zscan_panels
     zscan_panel_traces[cid] = join(traces, ",\n")
 end
 
-# ── Single-event waveform traces (detail event) ──
+# ── Single-event waveform traces (detail event, preamp shaped) ──
 single_traces = String[]
 for (cid, wf) in enumerate(detail_evt.waveforms)
     ismissing(wf) && continue
@@ -312,18 +333,20 @@ for (cid, wf) in enumerate(detail_evt.waveforms)
     sig  = Float64.(ustrip.(collect(wf.signal)))
     dt = t_ns[2] - t_ns[1]
     cur = diff(sig) ./ dt
-    t_mid = t_ns[1:end-1] .+ dt/2
     # Skip contacts with negligible signal
     max_abs = maximum(abs, cur; init=0.0)
     max_abs < 1e-15 && continue
+    # Apply preamp
+    t_pre, sig_pre = apply_preamp(cur, DT_NS, PREAMP_B0, PREAMP_A1;
+        display_us=PREAMP_DISPLAY_US, subsample=PREAMP_SUBSAMPLE)
     dash = cid in CATHODE_IDS ? "dash" : "solid"
     w = cid == CENTER_ANODE ? 3 : 1.5
-    push!(single_traces, """{x:$(js_array(t_mid)),y:$(js_array(cur)),
+    push!(single_traces, """{x:$(js_array(t_pre)),y:$(js_array(sig_pre)),
       type:'scatter',mode:'lines',name:'$(contact_names[cid])',
       line:{color:'$(contact_colors[cid])',width:$w,dash:'$dash'}}""")
 end
 
-# ── 6-Panel: (D) anode signals, (E) cathode signals ──
+# ── 6-Panel: (D) anode signals, (E) cathode signals (preamp shaped) ──
 panel_d_traces = String[]
 panel_e_traces = String[]
 for (cid, wf) in enumerate(detail_evt.waveforms)
@@ -332,11 +355,13 @@ for (cid, wf) in enumerate(detail_evt.waveforms)
     sig  = Float64.(ustrip.(collect(wf.signal)))
     dt = t_ns[2] - t_ns[1]
     cur = diff(sig) ./ dt
-    t_mid = t_ns[1:end-1] .+ dt/2
     max_abs = maximum(abs, cur; init=0.0)
     max_abs < 1e-15 && continue
+    # Apply preamp
+    t_pre, sig_pre = apply_preamp(cur, DT_NS, PREAMP_B0, PREAMP_A1;
+        display_us=PREAMP_DISPLAY_US, subsample=PREAMP_SUBSAMPLE)
     w = cid == CENTER_ANODE ? 3 : 1.5
-    tr = """{x:$(js_array(t_mid)),y:$(js_array(cur)),
+    tr = """{x:$(js_array(t_pre)),y:$(js_array(sig_pre)),
       type:'scatter',mode:'lines',name:'$(contact_names[cid])',
       line:{color:'$(contact_colors[cid])',width:$w}}"""
     if cid in ANODE_IDS || cid == STEERING_ID
@@ -482,8 +507,8 @@ z-scan: $(Z_FROM_CATHODE[1])–$(Z_FROM_CATHODE[end]) mm from cathode &bull; $(t
 </table>
 </div>
 
-<h2>Z-Scan: Induced Current Waveforms</h2>
-<p class="note">Each panel overlays waveforms for all 9 depths. Blue = near cathode, red = near anode.</p>
+<h2>Z-Scan: Preamp-Shaped Waveforms</h2>
+<p class="note">Each panel overlays preamp output for all 9 depths. Blue = near cathode, red = near anode. Charge-sensitive preamp with &tau; &asymp; 70 &mu;s decay.</p>
 <div class="g2">
   <div class="pb"><div id="zs0" style="height:350px"></div></div>
   <div class="pb"><div id="zs1" style="height:350px"></div></div>
@@ -492,7 +517,7 @@ z-scan: $(Z_FROM_CATHODE[1])–$(Z_FROM_CATHODE[end]) mm from cathode &bull; $(t
 </div>
 
 <h2>Single Event Waveform (z = $(detail_z_cathode) mm from cathode)</h2>
-<p class="note">Solid = anodes, dashed = cathodes. Center anode (red) is the primary collecting pixel.</p>
+<p class="note">Preamp-shaped output. Solid = anodes, dashed = cathodes. Center anode (red) is the primary collecting pixel.</p>
 <div class="pb"><div id="single" style="height:420px"></div></div>
 
 <h2>Event Visualization (z = $(detail_z_cathode) mm from cathode)</h2>
@@ -557,15 +582,15 @@ var zsData = [
 for(var i=0;i<4;i++){
   Plotly.newPlot(zsIds[i],zsData[i],{
     title:zsTitles[i],
-    xaxis:{title:'Time (ns)'},yaxis:{title:'dQ/dt (a.u./ns)'},
+    xaxis:{title:'Time (ns)'},yaxis:{title:'Preamp output (a.u.)'},
     margin:{t:40,b:45,l:60,r:10},showlegend:false
   },C);
 }
 
 // ── Single event waveform ──
 Plotly.newPlot('single',[$(join(single_traces,",\n"))],{
-  title:'Induced Current — z = $(detail_z_cathode) mm from cathode',
-  xaxis:{title:'Time (ns)'},yaxis:{title:'dQ/dt (a.u./ns)'},
+  title:'Preamp Output — z = $(detail_z_cathode) mm from cathode',
+  xaxis:{title:'Time (ns)'},yaxis:{title:'Preamp output (a.u.)'},
   margin:{t:40,b:50,l:70,r:20},hovermode:'x unified'
 },C);
 
@@ -597,15 +622,15 @@ Plotly.newPlot('pc',[$(mobile_traces)],{
 
 // ── 6-Panel: (D) Anode signals ──
 Plotly.newPlot('pd',[$(join(panel_d_traces,",\n"))],{
-  title:'(D) Anode Induced Current',
-  xaxis:{title:'Time (ns)'},yaxis:{title:'dQ/dt (a.u./ns)'},
+  title:'(D) Anode Preamp Output',
+  xaxis:{title:'Time (ns)'},yaxis:{title:'Preamp output (a.u.)'},
   margin:{t:35,b:40,l:50,r:10},hovermode:'x unified'
 },C);
 
 // ── 6-Panel: (E) Cathode signals ──
 Plotly.newPlot('pe',[$(join(panel_e_traces,",\n"))],{
-  title:'(E) Cathode Induced Current',
-  xaxis:{title:'Time (ns)'},yaxis:{title:'dQ/dt (a.u./ns)'},
+  title:'(E) Cathode Preamp Output',
+  xaxis:{title:'Time (ns)'},yaxis:{title:'Preamp output (a.u.)'},
   margin:{t:35,b:40,l:50,r:10},hovermode:'x unified'
 },C);
 
