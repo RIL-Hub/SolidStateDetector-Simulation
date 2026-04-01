@@ -37,6 +37,11 @@ detectors:
       geometry:
         box:
           widths: [40, 40, 5]
+      charge_drift_model:
+        model: IsotropicChargeDriftModel
+        mobilities:
+          e: 1000cm^2/(V*s)
+          h: 80cm^2/(V*s)
       impurity_density:
         name: constant
         value: 0

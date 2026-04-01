@@ -27,7 +27,7 @@ const MAX_NSTEPS      = 50000             # 5 μs window
 const DETAIL_Z_IDX    = 5                 # center depth for detailed event
 
 const PREAMP_B0       = 1400.0            # gain
-const PREAMP_A1       = 0.99999285714285714  # pole (τ ≈ 70 μs decay)
+const PREAMP_A1       = 0.99999285714285714  # pole (τ ≈ 140 μs decay)
 const PREAMP_DISPLAY_US = 5.0             # show 5 μs of preamp output
 const PREAMP_SUBSAMPLE = 5                # display every 5th sample (0.5 ns)
 
