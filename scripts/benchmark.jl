@@ -603,7 +603,7 @@ var zsData = [
 for(var i=0;i<4;i++){
   Plotly.newPlot(zsIds[i],zsData[i],{
     title:zsTitles[i],
-    xaxis:{title:'Time (ns)'},yaxis:{title:'Preamp output (a.u.)'},
+    xaxis:{title:'Time (ns)'},yaxis:{title:'Induced current'},
     margin:{t:40,b:45,l:60,r:10},showlegend:false
   },C);
 }
@@ -611,7 +611,7 @@ for(var i=0;i<4;i++){
 // ── Single event waveform ──
 Plotly.newPlot('single',[$(join(single_traces,",\n"))],{
   title:'Preamp Output — z = $(detail_z_cathode) mm from cathode',
-  xaxis:{title:'Time (ns)'},yaxis:{title:'Preamp output (a.u.)'},
+  xaxis:{title:'Time (ns)'},yaxis:{title:'Induced current'},
   margin:{t:40,b:50,l:70,r:20},hovermode:'x unified'
 },C);
 
@@ -644,14 +644,14 @@ Plotly.newPlot('pc',[$(mobile_traces)],{
 // ── 6-Panel: (D) Anode signals ──
 Plotly.newPlot('pd',[$(join(panel_d_traces,",\n"))],{
   title:'(D) Anode Preamp Output',
-  xaxis:{title:'Time (ns)'},yaxis:{title:'Preamp output (a.u.)'},
+  xaxis:{title:'Time (ns)'},yaxis:{title:'Induced current'},
   margin:{t:35,b:40,l:50,r:10},hovermode:'x unified'
 },C);
 
 // ── 6-Panel: (E) Cathode signals ──
 Plotly.newPlot('pe',[$(join(panel_e_traces,",\n"))],{
   title:'(E) Cathode Preamp Output',
-  xaxis:{title:'Time (ns)'},yaxis:{title:'Preamp output (a.u.)'},
+  xaxis:{title:'Time (ns)'},yaxis:{title:'Induced current'},
   margin:{t:35,b:40,l:50,r:10},hovermode:'x unified'
 },C);
 
