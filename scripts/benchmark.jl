@@ -18,6 +18,7 @@ mkpath("output")
 # ═══════════════════════════════════════════════════════════════════════════════
 
 const ENERGY_KEV      = Float32(662)      # Cs-137 gamma
+const N_CARRIERS      = 200               # representative charge cloud size
 const INTERACTION_X   = 0.1               # mm (near center anode 3)
 const INTERACTION_Y   = 2.5               # mm (centered over cathode 2)
 const Z_FROM_CATHODE  = collect(0.5:0.5:4.5)  # mm, 9 depths
@@ -185,9 +186,9 @@ t_zscan = @elapsed for (zi, z_mm) in enumerate(Z_SIM)
     y_m = Float32(INTERACTION_Y / 1000)
     z_m = Float32(z_mm / 1000)
 
-    print("  z=$(z_mm)mm ($(Z_FROM_CATHODE[zi])mm from cathode) … ")
+    print("  z=$(z_mm)mm ($(Z_FROM_CATHODE[zi])mm from cathode), $N_CARRIERS carriers … ")
     pos = CartesianPoint{Float32}(x_m, y_m, z_m)
-    evt = Event(pos)
+    evt = Event([pos], [ENERGY_KEV * u"keV"], N_CARRIERS; number_of_shells=2)
     simulate!(evt, sim; Δt=DT_NS * u"ns", max_nsteps=MAX_NSTEPS)
     zscan_events[zi] = evt
     println("done")
@@ -495,7 +496,7 @@ z-scan: $(Z_FROM_CATHODE[1])–$(Z_FROM_CATHODE[end]) mm from cathode &bull; $(t
 <div class="g2">
 <table>
 <tr><th>Source</th><td class="val">Cs-137, 662 keV</td></tr>
-<tr><th>Interaction type</th><td class="val">Single photoelectric</td></tr>
+<tr><th>Interaction type</th><td class="val">Photoelectric, $(N_CARRIERS) carriers</td></tr>
 <tr><th>Position (x, y)</th><td class="val">$(INTERACTION_X) mm, $(INTERACTION_Y) mm</td></tr>
 <tr><th>Z-scan range</th><td class="val">$(Z_FROM_CATHODE[1])–$(Z_FROM_CATHODE[end]) mm from cathode ($(length(Z_SIM)) points)</td></tr>
 </table>
