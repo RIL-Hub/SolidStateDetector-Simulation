@@ -174,11 +174,8 @@ println("$(round(t_wp; digits=2))s")
 
 println("\n── Z-Scan: $(length(Z_SIM)) depths, x=$(INTERACTION_X)mm, y=$(INTERACTION_Y)mm ──")
 
-# zscan_current[contact_id][z_idx] = (t_ns, current)  — raw induced current
-# zscan_preamp[contact_id][z_idx]  = (t_ns, shaped)   — after preamp filter
-zscan_current = Dict{Int, Vector{Tuple{Vector{Float64}, Vector{Float64}}}}()
+# zscan_preamp[contact_id][z_idx] = (t_ns, shaped) — after preamp filter
 zscan_preamp  = Dict{Int, Vector{Tuple{Vector{Float64}, Vector{Float64}}}}()
-zscan_charge  = Dict{Int, Vector{Tuple{Vector{Float64}, Vector{Float64}}}}()
 zscan_events  = Vector{Any}(nothing, length(Z_SIM))
 
 t_zscan = @elapsed for (zi, z_mm) in enumerate(Z_SIM)
@@ -205,12 +202,8 @@ t_zscan = @elapsed for (zi, z_mm) in enumerate(Z_SIM)
         t_pre, sig_pre = apply_preamp(cur, DT_NS, PREAMP_B0, PREAMP_A1;
             display_us=PREAMP_DISPLAY_US, subsample=PREAMP_SUBSAMPLE)
 
-        haskey(zscan_current, cid) || (zscan_current[cid] = [])
         haskey(zscan_preamp, cid)  || (zscan_preamp[cid]  = [])
-        haskey(zscan_charge, cid)  || (zscan_charge[cid]  = [])
-        push!(zscan_current[cid], (t_mid, cur))
         push!(zscan_preamp[cid],  (t_pre, sig_pre))
-        push!(zscan_charge[cid],  (t_ns, sig))
     end
 end
 println("Z-scan total: $(round(t_zscan; digits=2))s")
@@ -231,17 +224,28 @@ h_paths_xz = Vector{Tuple{Vector{Float64}, Vector{Float64}}}()
 e_z_vs_t   = Vector{Tuple{Vector{Float64}, Vector{Float64}}}()
 h_z_vs_t   = Vector{Tuple{Vector{Float64}, Vector{Float64}}}()
 
+const MAX_DISPLAY_PATHS = 20   # cap drift paths shown per carrier type
+const PATH_SUBSAMPLE    = 50   # show every 50th point in drift paths
+
 if !ismissing(detail_evt.drift_paths)
-    println("\nExtracting drift paths ($(length(detail_evt.drift_paths)) carriers) …")
+    n_paths = length(detail_evt.drift_paths)
+    println("\nExtracting drift paths ($n_paths carriers, showing ≤$MAX_DISPLAY_PATHS) …")
     dp1 = detail_evt.drift_paths[1]
     println("  EHDriftPath fields: $(fieldnames(typeof(dp1)))")
 
-    for dp in detail_evt.drift_paths
+    # Evenly sample a subset of paths for display
+    display_indices = if n_paths <= MAX_DISPLAY_PATHS
+        1:n_paths
+    else
+        round.(Int, range(1, n_paths; length=MAX_DISPLAY_PATHS))
+    end
+
+    for di in display_indices
+        dp = detail_evt.drift_paths[di]
         fnames = fieldnames(typeof(dp))
         for (paths_xz, paths_zt, fname_hint) in [
             (e_paths_xz, e_z_vs_t, :e),
             (h_paths_xz, h_z_vs_t, :h)]
-            # Try common field name patterns
             path = nothing
             for fn in fnames
                 if startswith(string(fn), string(fname_hint))
@@ -251,9 +255,11 @@ if !ismissing(detail_evt.drift_paths)
             end
             path === nothing && continue
             try
-                xs = Float64[pt.x * 1000 for pt in path]
-                zs = Float64[pt.z * 1000 for pt in path]
-                ts = Float64.(collect(0:length(path)-1) .* DT_NS)
+                # Subsample path points for display
+                idx = 1:PATH_SUBSAMPLE:length(path)
+                xs = Float64[path[i].x * 1000 for i in idx]
+                zs = Float64[path[i].z * 1000 for i in idx]
+                ts = Float64.(collect(idx) .- 1) .* DT_NS
                 push!(paths_xz, (xs, zs))
                 push!(paths_zt, (ts, zs))
             catch e
@@ -261,7 +267,7 @@ if !ismissing(detail_evt.drift_paths)
             end
         end
     end
-    println("  Extracted $(length(e_paths_xz)) electron + $(length(h_paths_xz)) hole paths")
+    println("  Extracted $(length(e_paths_xz)) electron + $(length(h_paths_xz)) hole paths (subsampled)")
 else
     println("\nNo drift paths available (drift_paths is missing)")
 end
@@ -397,17 +403,31 @@ for (i, (ts, zs)) in enumerate(h_z_vs_t)
       line:{color:'#e74c3c',width:1,dash:'dash'},showlegend:false}""")
 end
 
-# ── 6-Panel: (C) mobile charge vs time ──
+# ── 6-Panel: (C) mobile charge vs time (use ALL drift paths, not just displayed subset) ──
 mobile_traces = ""
-if !isempty(e_paths_xz)
-    e_lens = [length(xs) for (xs, _) in e_paths_xz]
-    h_lens = [length(xs) for (xs, _) in h_paths_xz]
-    max_t = max(maximum(e_lens; init=0), maximum(h_lens; init=0))
-    ne = length(e_lens)
-    nh = length(h_lens)
-    t_steps = Float64.(collect(0:max_t-1) .* DT_NS)
-    mobile_e = Float64[count(l -> l > i, e_lens) / max(ne, 1) for i in 0:max_t-1]
-    mobile_h = Float64[count(l -> l > i, h_lens) / max(nh, 1) for i in 0:max_t-1]
+if !ismissing(detail_evt.drift_paths) && !isempty(detail_evt.drift_paths)
+    # Compute actual path lengths from all carriers
+    all_e_lens = Int[]
+    all_h_lens = Int[]
+    for dp in detail_evt.drift_paths
+        fnames = fieldnames(typeof(dp))
+        for fn in fnames
+            path = getfield(dp, fn)
+            if startswith(string(fn), "e")
+                try push!(all_e_lens, length(path)) catch; end
+            elseif startswith(string(fn), "h")
+                try push!(all_h_lens, length(path)) catch; end
+            end
+        end
+    end
+    max_steps = max(maximum(all_e_lens; init=0), maximum(all_h_lens; init=0))
+    ne = length(all_e_lens)
+    nh = length(all_h_lens)
+    # Subsample output for display (every 50th step)
+    display_steps = 1:PATH_SUBSAMPLE:max_steps
+    t_steps = Float64.(collect(display_steps) .- 1) .* DT_NS
+    mobile_e = Float64[count(l -> l > i, all_e_lens) / max(ne, 1) for i in display_steps]
+    mobile_h = Float64[count(l -> l > i, all_h_lens) / max(nh, 1) for i in display_steps]
     mobile_traces = """{x:$(js_array(t_steps)),y:$(js_array(mobile_e)),
       type:'scatter',mode:'lines',name:'Electrons',
       line:{color:'#3498db',width:2}},
