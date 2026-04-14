@@ -34,6 +34,11 @@ jobs:
         run: git clone https://github.com/MaxTeicheira/weighting-potential-sim.git
 
       # ── Python setup (self-hosted runner has Python 3.9, need ≥3.10) ──
+      - name: Clean stale micromamba state
+        run: |
+          rm -f /home/mteichei/micromamba-bin/micromamba
+          rm -rf /home/mteichei/micromamba/envs/ctsi
+
       - name: Setup micromamba
         uses: mamba-org/setup-micromamba@v2
         with:
