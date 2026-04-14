@@ -63,11 +63,25 @@ jobs:
           mkdir -p output
           touch single_event.txt
 
+      # ── CTSI: single event ──
       - name: Run CTSI event (center, mid-depth, 662 keV)
         run: |
           cd ctsi/ctsi
           python3 -m tools.ctsi_toolkit run-event \
             --x 0 --y 0 --z 0.25 --energy 0.662
+
+      # ── CTSI: z-scan ──
+      - name: Run CTSI z-scan (9 depths)
+        run: |
+          cd ctsi/ctsi
+          mkdir -p output/zscan
+          for z in 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45; do
+            echo "=== CTSI z=$z cm ==="
+            mkdir -p output/zscan/z_${z}
+            python3 -m tools.ctsi_toolkit run-event \
+              --x 0 --y 0 --z $z --energy 0.662
+            cp output/interactiveOut.txt output/zscan/z_${z}/interactiveOut.txt
+          done
 
       # ── SSD setup ──
       - name: Setup Julia
@@ -86,6 +100,7 @@ jobs:
       - name: Install SSD dependencies
         run: julia --project=ssd -e 'using Pkg; Pkg.instantiate()'
 
+      # ── SSD: single event ──
       - name: Run SSD event (matching position)
         env:
           SSD_ENERGY_KEV: "662"
@@ -93,24 +108,50 @@ jobs:
           SSD_Y_MM: "2.5"
           SSD_Z_MM: "0.0"
           SSD_N_CARRIERS: "50"
+          SSD_MODE: "single"
         run: |
           cd ssd
           julia --project=. --threads=auto scripts/export_waveforms.jl
 
-      # ── Comparison ──
-      - name: Generate comparison report
+      # ── SSD: z-scan ──
+      - name: Run SSD z-scan (9 depths)
+        env:
+          SSD_ENERGY_KEV: "662"
+          SSD_X_MM: "0.0"
+          SSD_Y_MM: "2.5"
+          SSD_N_CARRIERS: "50"
+          SSD_MODE: "zscan"
+        run: |
+          cd ssd
+          julia --project=. --threads=auto scripts/export_waveforms.jl
+
+      # ── Comparison: single event ──
+      - name: Generate single-event comparison report
         run: |
           python3 ssd/scripts/compare.py \
+            --mode single \
             --ssd ssd/output/ssd_waveforms.json \
             --ctsi ctsi/ctsi/output/interactiveOut.txt \
             --ctsi-root ctsi/ctsi \
             --output ssd/output/comparison.html
 
+      # ── Comparison: z-scan ──
+      - name: Generate z-scan comparison report
+        run: |
+          python3 ssd/scripts/compare.py \
+            --mode zscan \
+            --ssd ssd/output/ssd_zscan.json \
+            --ctsi-dir ctsi/ctsi/output/zscan \
+            --ctsi-root ctsi/ctsi \
+            --output ssd/output/zscan_comparison.html
+
       - name: Prepare Pages site
         run: |
           mkdir -p site
           cp ssd/output/comparison.html site/index.html
+          cp ssd/output/zscan_comparison.html site/zscan.html
           cp ssd/output/ssd_waveforms.json site/ssd_waveforms.json
+          cp ssd/output/ssd_zscan.json site/ssd_zscan.json
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
