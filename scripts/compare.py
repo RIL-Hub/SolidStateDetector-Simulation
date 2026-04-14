@@ -28,8 +28,11 @@ import numpy as np
 
 
 # ── Z-scan coordinate mapping ──
+# CTSI config has Event_z_pos_scale_factor=-1 and Event_z_pos_offset=0.5,
+# so z_internal = -z_input + 0.5.  Near-cathode in CTSI is z_input=0.45
+# (→ z_internal=0.05), not z_input=0.05.
 Z_FROM_CATHODE = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]
-CTSI_Z_CM = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45]
+CTSI_Z_CM = [0.45, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15, 0.10, 0.05]
 
 # Contacts to compare in z-scan: (SSD contact name, display label)
 ZSCAN_ELECTRODES = [
