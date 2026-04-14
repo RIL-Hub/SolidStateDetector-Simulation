@@ -30,12 +30,8 @@ jobs:
           path: ctsi
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Checkout weighting-potential-sim
-        uses: actions/checkout@v4
-        with:
-          repository: MaxTeicheiraUCSC/weighting-potential-sim
-          path: weighting-potential-sim
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Clone weighting-potential-sim
+        run: git clone https://github.com/MaxTeicheira/weighting-potential-sim.git
 
       # ── CTSI setup ──
       - name: Setup Python
@@ -44,25 +40,34 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python deps
-        run: pip install numpy scipy matplotlib
+        run: |
+          pip install numpy scipy matplotlib
+          pip install -e weighting-potential-sim
 
       - name: Generate CTSI fields
+        run: python weighting-potential-sim/generate_ctsi_v4_fields.py
+
+      - name: Copy fields to CTSI
         run: |
-          cd weighting-potential-sim
-          python3 generate_efield.py --output ../ctsi/currCZT/
-          python3 generate_weighting_potentials.py --output ../ctsi/currCZT/
+          mkdir -p ctsi/ctsi/currCZT
+          cp output/ctsi_v4/*.dat ctsi/ctsi/currCZT/
 
       - name: Build CTSI
         run: |
           cd ctsi/ctsi
           bash compile_all.sh
 
+      - name: Prepare CTSI runtime
+        run: |
+          cd ctsi/ctsi
+          mkdir -p output
+          touch single_event.txt
+
       - name: Run CTSI event (center, mid-depth, 662 keV)
         run: |
           cd ctsi/ctsi
           python3 -m tools.ctsi_toolkit run-event \
-            --x 0 --y 0 --z 0.25 --energy 0.662 \
-            --exe ./ctsi.exe
+            --x 0 --y 0 --z 0.25 --energy 0.662
 
       # ── SSD setup ──
       - name: Setup Julia
