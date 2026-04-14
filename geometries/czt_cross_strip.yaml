@@ -41,15 +41,15 @@ detectors:
         model: IsotropicChargeDriftModel
         mobilities:
           e: 1000cm^2/(V*s)
-          h: 80cm^2/(V*s)
+          h: 50cm^2/(V*s)
       impurity_density:
         name: constant
         value: 0
       charge_trapping_model:
         model: ConstantLifetime
         parameters:
-          τe: 1μs
-          τh: 50ns
+          τe: 10μs
+          τh: 1μs
 
     contacts:
       # ── Anode strips (z = +2.5 mm, top face) ──

@@ -18,7 +18,7 @@ mkpath("output")
 # ═══════════════════════════════════════════════════════════════════════════════
 
 const ENERGY_KEV      = Float32(662)      # Cs-137 gamma
-const N_CARRIERS      = 200               # representative charge cloud size
+const N_CARRIERS      = 50                # match CTSI charge elements
 const INTERACTION_X   = 0.1               # mm (near center anode 3)
 const INTERACTION_Y   = 2.5               # mm (centered over cathode 2)
 const Z_FROM_CATHODE  = collect(0.5:0.5:4.5)  # mm, 9 depths

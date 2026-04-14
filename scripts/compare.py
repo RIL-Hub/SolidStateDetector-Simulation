@@ -259,10 +259,10 @@ def build_html(ssd_data, ctsi_result, ctsi_spec, output_path):
 <tr><th></th><th class="ssd">SSD</th><th class="ctsi">CTSI</th></tr>
 <tr><td>Crystal</td><td class="val">40x40x5 mm CZT</td><td class="val">40x40x5 mm CZT</td></tr>
 <tr><td>&mu;<sub>e</sub></td><td class="val">1000 cm&sup2;/Vs</td><td class="val">{ctsi_mu_e} cm&sup2;/Vs</td></tr>
-<tr><td>&mu;<sub>h</sub></td><td class="val">80 cm&sup2;/Vs</td><td class="val">{ctsi_mu_h} cm&sup2;/Vs</td></tr>
-<tr><td>&tau;<sub>e</sub></td><td class="val">1 &mu;s</td><td class="val">{ctsi_tau_e}</td></tr>
-<tr><td>&tau;<sub>h</sub></td><td class="val">50 ns</td><td class="val">{ctsi_tau_h}</td></tr>
-<tr><td>Carriers</td><td class="val">{ssd_data.get('n_carriers', '?')}</td><td class="val">50</td></tr>
+<tr><td>&mu;<sub>h</sub></td><td class="val">50 cm&sup2;/Vs</td><td class="val">{ctsi_mu_h} cm&sup2;/Vs</td></tr>
+<tr><td>&tau;<sub>e</sub></td><td class="val">10 &mu;s</td><td class="val">{ctsi_tau_e}</td></tr>
+<tr><td>&tau;<sub>h</sub></td><td class="val">1 &mu;s</td><td class="val">{ctsi_tau_h}</td></tr>
+<tr><td>Carriers</td><td class="val">{ssd_data.get('n_carriers', 50)}</td><td class="val">50</td></tr>
 <tr><td>Time step</td><td class="val">{ssd_data.get('dt_ns', '?')} ns</td><td class="val">adaptive</td></tr>
 <tr><td>Preamp &tau;</td><td class="val">140 &mu;s</td><td class="val">140 &mu;s</td></tr>
 </table>

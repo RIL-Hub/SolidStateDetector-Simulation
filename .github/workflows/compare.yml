@@ -92,7 +92,7 @@ jobs:
           SSD_X_MM: "0.0"
           SSD_Y_MM: "2.5"
           SSD_Z_MM: "0.0"
-          SSD_N_CARRIERS: "200"
+          SSD_N_CARRIERS: "50"
         run: |
           cd ssd
           julia --project=. --threads=auto scripts/export_waveforms.jl

@@ -13,7 +13,7 @@ const ENERGY_KEV   = parse(Float32, get(ENV, "SSD_ENERGY_KEV", "662"))
 const X_MM         = parse(Float64, get(ENV, "SSD_X_MM", "0.0"))
 const Y_MM         = parse(Float64, get(ENV, "SSD_Y_MM", "2.5"))
 const Z_MM         = parse(Float64, get(ENV, "SSD_Z_MM", "0.0"))      # mid-depth in SSD coords
-const N_CARRIERS   = parse(Int,     get(ENV, "SSD_N_CARRIERS", "200"))
+const N_CARRIERS   = parse(Int,     get(ENV, "SSD_N_CARRIERS", "50"))
 const DT_NS        = 0.1
 const MAX_NSTEPS   = 50000
 
