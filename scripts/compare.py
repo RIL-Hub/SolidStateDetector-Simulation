@@ -295,21 +295,33 @@ def build_zscan_html(ssd_data, ctsi_spec, metrics, panels, output_path):
 </table>"""
 
     # ── Plot panels ──
+    # Normalize both signals to peak amplitude so they're visually comparable.
+    # SSD outputs ~1e9 (arb. units), CTSI outputs ~1e-14 (Coulombs).
+    def normalize(signal):
+        """Normalize signal to [-1, 1] by dividing by peak absolute value."""
+        if signal is None:
+            return None
+        arr = np.array(signal) if not isinstance(signal, np.ndarray) else signal
+        peak = np.max(np.abs(arr))
+        if peak < SIGNAL_THRESHOLD:
+            return arr
+        return (arr / peak).tolist()
+
     panel_divs = []
     panel_js = []
     for panel_id, title, ssd_t, ssd_s, ctsi_t, ctsi_s in panels:
         traces = []
         if ssd_t is not None:
-            traces.append(make_trace("SSD", ssd_t, ssd_s, "#e74c3c"))
+            traces.append(make_trace("SSD", ssd_t, normalize(ssd_s), "#e74c3c"))
         if ctsi_t is not None:
-            traces.append(make_trace("CTSI", ctsi_t, ctsi_s, "#3498db"))
+            traces.append(make_trace("CTSI", ctsi_t, normalize(ctsi_s), "#3498db"))
 
         panel_divs.append(
             f'<div class="pb"><div id="{panel_id}" style="height:350px"></div></div>')
         trace_str = ",\n".join(traces)
         panel_js.append(f"""Plotly.newPlot('{panel_id}',[{trace_str}],{{
   title:'{title}',
-  xaxis:{{title:'Time (ns)'}},yaxis:{{title:'Preamp output'}},
+  xaxis:{{title:'Time (ns)'}},yaxis:{{title:'Normalized amplitude'}},
   margin:{{t:40,b:50,l:70,r:20}},hovermode:'x unified'
 }},C);""")
 
