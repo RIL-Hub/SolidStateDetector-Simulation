@@ -65,15 +65,15 @@ jobs:
           mkdir -p output
           touch single_event.txt
 
-      # ── CTSI: single event ──
+      # ── CTSI: single event (x=0.01 near center anode, y=0.25 mid-cathode) ──
       - name: Run CTSI event (center, mid-depth, 662 keV)
         shell: micromamba-shell {0}
         run: |
           cd ctsi/ctsi
           python3 -m tools.ctsi_toolkit run-event \
-            --x 0 --y 0 --z 0.25 --energy 0.662
+            --x 0.01 --y 0.25 --z 0.25 --energy 0.662
 
-      # ── CTSI: z-scan ──
+      # ── CTSI: z-scan (9 depths, same lateral position) ──
       - name: Run CTSI z-scan (9 depths)
         shell: micromamba-shell {0}
         run: |
@@ -83,7 +83,7 @@ jobs:
             echo "=== CTSI z=$z cm ==="
             mkdir -p output/zscan/z_${z}
             python3 -m tools.ctsi_toolkit run-event \
-              --x 0 --y 0 --z $z --energy 0.662
+              --x 0.01 --y 0.25 --z $z --energy 0.662
             cp output/interactiveOut.txt output/zscan/z_${z}/interactiveOut.txt
           done
 
