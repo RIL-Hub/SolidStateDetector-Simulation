@@ -297,7 +297,7 @@ def build_zscan_html(ssd_data, ctsi_spec, metrics, panels, output_path):
     # ── Plot panels ──
     # Normalize both signals to peak amplitude so they're visually comparable.
     # SSD outputs ~1e9 (arb. units), CTSI outputs ~1e-14 (Coulombs).
-    def normalize(signal):
+    def normalize(signal, flip=False):
         """Normalize signal to [-1, 1] by dividing by peak absolute value."""
         if signal is None:
             return None
@@ -305,14 +305,18 @@ def build_zscan_html(ssd_data, ctsi_spec, metrics, panels, output_path):
         peak = np.max(np.abs(arr))
         if peak < SIGNAL_THRESHOLD:
             return arr
-        return (arr / peak).tolist()
+        normed = arr / peak
+        if flip:
+            normed = -normed
+        return normed.tolist()
 
     panel_divs = []
     panel_js = []
     for panel_id, title, ssd_t, ssd_s, ctsi_t, ctsi_s in panels:
         traces = []
         if ssd_t is not None:
-            traces.append(make_trace("SSD", ssd_t, normalize(ssd_s), "#e74c3c"))
+            # Flip SSD polarity so signals align with CTSI convention
+            traces.append(make_trace("SSD", ssd_t, normalize(ssd_s, flip=True), "#e74c3c"))
         if ctsi_t is not None:
             traces.append(make_trace("CTSI", ctsi_t, normalize(ctsi_s), "#3498db"))
 
