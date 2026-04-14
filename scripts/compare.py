@@ -23,7 +23,7 @@ def parse_ssd(path):
 
 def parse_ctsi(output_path, ctsi_root):
     """Parse CTSI interactiveOut.txt using its Python toolkit."""
-    sys.path.insert(0, ctsi_root)
+    sys.path.insert(0, os.path.abspath(ctsi_root))
     from tools.ctsi_toolkit.parser import parse_interactive_output
     result = parse_interactive_output(output_path, mode="full")
 
@@ -196,8 +196,17 @@ def build_html(ssd_data, ctsi_result, ctsi_spec, output_path):
     ssd_pos = ssd_data.get("position_mm", {})
     ctsi_mu_e = ctsi_spec.get("MU_E", "?")
     ctsi_mu_h = ctsi_spec.get("MU_H", "?")
-    ctsi_tau_e = ctsi_spec.get("TAU_E", "?")
-    ctsi_tau_h = ctsi_spec.get("TAU_H", "?")
+    # Format lifetimes from seconds to readable units
+    try:
+        ctsi_tau_e_s = float(ctsi_spec.get("TAU_E", "0"))
+        ctsi_tau_e = f"{ctsi_tau_e_s*1e6:.0f} &mu;s"
+    except ValueError:
+        ctsi_tau_e = ctsi_spec.get("TAU_E", "?")
+    try:
+        ctsi_tau_h_s = float(ctsi_spec.get("TAU_H", "0"))
+        ctsi_tau_h = f"{ctsi_tau_h_s*1e6:.1f} &mu;s"
+    except ValueError:
+        ctsi_tau_h = ctsi_spec.get("TAU_H", "?")
 
     # -- Generate HTML --
     panel_divs = []
@@ -251,8 +260,8 @@ def build_html(ssd_data, ctsi_result, ctsi_spec, output_path):
 <tr><td>Crystal</td><td class="val">40x40x5 mm CZT</td><td class="val">40x40x5 mm CZT</td></tr>
 <tr><td>&mu;<sub>e</sub></td><td class="val">1000 cm&sup2;/Vs</td><td class="val">{ctsi_mu_e} cm&sup2;/Vs</td></tr>
 <tr><td>&mu;<sub>h</sub></td><td class="val">80 cm&sup2;/Vs</td><td class="val">{ctsi_mu_h} cm&sup2;/Vs</td></tr>
-<tr><td>&tau;<sub>e</sub></td><td class="val">1 &mu;s</td><td class="val">{ctsi_tau_e} s</td></tr>
-<tr><td>&tau;<sub>h</sub></td><td class="val">50 ns</td><td class="val">{ctsi_tau_h} s</td></tr>
+<tr><td>&tau;<sub>e</sub></td><td class="val">1 &mu;s</td><td class="val">{ctsi_tau_e}</td></tr>
+<tr><td>&tau;<sub>h</sub></td><td class="val">50 ns</td><td class="val">{ctsi_tau_h}</td></tr>
 <tr><td>Carriers</td><td class="val">{ssd_data.get('n_carriers', '?')}</td><td class="val">50</td></tr>
 <tr><td>Time step</td><td class="val">{ssd_data.get('dt_ns', '?')} ns</td><td class="val">adaptive</td></tr>
 <tr><td>Preamp &tau;</td><td class="val">140 &mu;s</td><td class="val">140 &mu;s</td></tr>
@@ -261,7 +270,7 @@ def build_html(ssd_data, ctsi_result, ctsi_spec, output_path):
 <tr><th></th><th class="ssd">SSD</th><th class="ctsi">CTSI</th></tr>
 <tr><td>Anodes</td><td class="val">5 (100 &mu;m, 1mm pitch)</td><td class="val">{ctsi_spec.get('NUM_ANODES','?')} (100 &mu;m, 1mm pitch)</td></tr>
 <tr><td>Cathodes</td><td class="val">2</td><td class="val">{ctsi_spec.get('NUM_CATHODES','?')}</td></tr>
-<tr><td>Bias</td><td class="val">-600 V cathode</td><td class="val">{ctsi_spec.get('BIAS','?')} V/cm</td></tr>
+<tr><td>Bias</td><td class="val">-600 V cathode</td><td class="val">{ctsi_spec.get('BIAS','?')} V/cm (600 V)</td></tr>
 <tr><td>Steering</td><td class="val">-80 V</td><td class="val">N/A</td></tr>
 <tr><td>Position</td>
     <td class="val">({ssd_pos.get('x','?')}, {ssd_pos.get('y','?')}, {ssd_pos.get('z','?')}) mm</td>
