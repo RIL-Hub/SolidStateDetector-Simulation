@@ -37,8 +37,10 @@ ZSCAN_ELECTRODES = [
     ("cathode_2", "Cathode"),
 ]
 
-# Minimum signal amplitude to include in Pearson calculation
-SIGNAL_THRESHOLD = 1e-12
+# Minimum signal amplitude to include in Pearson calculation.
+# CTSI outputs in Coulombs (~1e-14), SSD in arbitrary units (~1e9).
+# Use a very small threshold to avoid skipping valid CTSI signals.
+SIGNAL_THRESHOLD = 1e-20
 
 
 def parse_ssd(path):
