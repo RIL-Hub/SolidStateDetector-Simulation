@@ -1,0 +1,136 @@
+name: Compare SSD vs CTSI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+
+jobs:
+  compare:
+    name: Run comparison
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 90
+
+    env:
+      JULIA_NUM_THREADS: auto
+
+    steps:
+      - name: Checkout SSD
+        uses: actions/checkout@v4
+        with:
+          path: ssd
+
+      - name: Checkout CTSI
+        uses: actions/checkout@v4
+        with:
+          repository: RIL-Hub/CTSI
+          path: ctsi
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout weighting-potential-sim
+        uses: actions/checkout@v4
+        with:
+          repository: MaxTeicheiraUCSC/weighting-potential-sim
+          path: weighting-potential-sim
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── CTSI setup ──
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install numpy scipy matplotlib
+
+      - name: Generate CTSI fields
+        run: |
+          cd weighting-potential-sim
+          python3 generate_efield.py --output ../ctsi/currCZT/
+          python3 generate_weighting_potentials.py --output ../ctsi/currCZT/
+
+      - name: Build CTSI
+        run: |
+          cd ctsi/ctsi
+          bash compile_all.sh
+
+      - name: Run CTSI event (center, mid-depth, 662 keV)
+        run: |
+          cd ctsi/ctsi
+          python3 -m tools.ctsi_toolkit run-event \
+            --x 0 --y 0 --z 0.25 --energy 0.662 \
+            --exe ./ctsi.exe
+
+      # ── SSD setup ──
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - name: Add LegendJuliaRegistry
+        run: |
+          julia -e '
+            using Pkg
+            Pkg.Registry.add(RegistrySpec(url="https://github.com/legend-exp/LegendJuliaRegistry"))
+            Pkg.Registry.add("General")
+          '
+
+      - name: Install SSD dependencies
+        run: julia --project=ssd -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run SSD event (matching position)
+        env:
+          SSD_ENERGY_KEV: "662"
+          SSD_X_MM: "0.0"
+          SSD_Y_MM: "2.5"
+          SSD_Z_MM: "0.0"
+          SSD_N_CARRIERS: "200"
+        run: |
+          cd ssd
+          julia --project=. --threads=auto scripts/export_waveforms.jl
+
+      # ── Comparison ──
+      - name: Generate comparison report
+        run: |
+          python3 ssd/scripts/compare.py \
+            --ssd ssd/output/ssd_waveforms.json \
+            --ctsi ctsi/ctsi/output/interactiveOut.txt \
+            --ctsi-root ctsi/ctsi \
+            --output ssd/output/comparison.html
+
+      - name: Prepare Pages site
+        run: |
+          mkdir -p site
+          cp ssd/output/comparison.html site/index.html
+          cp ssd/output/ssd_waveforms.json site/ssd_waveforms.json
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+      - name: Upload all results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparison-results
+          path: |
+            ssd/output/
+            ctsi/ctsi/output/
+          retention-days: 90
+
+  deploy:
+    name: Deploy to Pages
+    needs: compare
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
