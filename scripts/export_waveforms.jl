@@ -121,8 +121,8 @@ function to_json(d::Dict)
     return String(take!(io))
 end
 
-"""Extract preamp waveforms from a simulated event, returning a Dict of contact_name => waveform data."""
-function extract_preamp_waveforms(evt)
+"""Extract raw induced current waveforms from a simulated event."""
+function extract_raw_waveforms(evt)
     waveforms = Dict{String, Any}()
     for (cid, wf) in enumerate(evt.waveforms)
         ismissing(wf) && continue
@@ -130,18 +130,20 @@ function extract_preamp_waveforms(evt)
         sig  = Float64.(ustrip.(collect(wf.signal)))
         dt = t_ns[2] - t_ns[1]
         cur = diff(sig) ./ dt
+        t_mid = t_ns[1:end-1] .+ dt/2
 
         max_abs = maximum(abs, cur; init=0.0)
         max_abs < 1e-15 && continue
 
-        t_pre, sig_pre = apply_preamp(cur, DT_NS, PREAMP_B0, PREAMP_A1;
-            display_us=PREAMP_DISPLAY_US, subsample=PREAMP_SUBSAMPLE)
+        # Subsample to ~1 ns spacing for export (every 10th point from 0.1ns grid)
+        raw_sub = 10
+        raw_idx = 1:raw_sub:length(cur)
 
         waveforms[contact_names[cid]] = Dict(
             "contact_id" => cid,
             "contact_type" => contact_types[cid],
-            "preamp_time_ns" => t_pre,
-            "preamp_signal" => sig_pre,
+            "time_ns" => t_mid[raw_idx],
+            "current" => cur[raw_idx],
         )
     end
     return waveforms
@@ -200,7 +202,7 @@ if MODE == "zscan"
         t_sim = @elapsed simulate!(evt, sim; Δt=DT_NS * u"ns", max_nsteps=MAX_NSTEPS)
         println("$(round(t_sim; digits=2))s")
 
-        zscan[z_key] = extract_preamp_waveforms(evt)
+        zscan[z_key] = extract_raw_waveforms(evt)
     end
 
     output = Dict(

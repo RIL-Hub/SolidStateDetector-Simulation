@@ -71,27 +71,34 @@ def parse_ctsi(output_path, ctsi_root):
     return result, spec
 
 
-def extract_ctsi_preamp(ctsi_result, ctsi_spec, contact_name):
-    """Extract preamp waveform for a specific contact from CTSI result.
+def extract_ctsi_raw(ctsi_result, ctsi_spec, contact_name):
+    """Extract raw induced current for a specific contact from CTSI result.
 
     Returns (time_ns, signal) or (None, None) if not found.
     """
     n_anodes = int(ctsi_spec.get("NUM_ANODES", 39))
     center_anode = n_anodes // 2
 
-    t_preamp_ns = ctsi_result.time_vec_preamp * 1e9
+    t_ns = ctsi_result.time_vec * 1e9
 
     if contact_name == "anode_3":
-        # Find center anode in CTSI
         for i, cid in enumerate(ctsi_result.an_collector_id):
             if cid == center_anode:
-                sig = ctsi_result.an_vs_time_preamp[i]
-                return t_preamp_ns[:len(sig)].copy(), sig.copy()
+                sig = ctsi_result.an_vs_time[i]
+                return t_ns[:len(sig)].copy(), sig.copy()
     elif contact_name == "cathode_2":
-        # Use the first (or only) cathode from CTSI
+        # Find the collecting cathode closest to center
+        # CTSI cathode IDs are 0-indexed; for 8 cathodes, center ≈ 3 or 4
+        n_cathodes = int(ctsi_spec.get("NUM_CATHODES", 8))
+        center_cathode = n_cathodes // 2
+        for i, cid in enumerate(ctsi_result.ca_collector_id):
+            if cid == center_cathode:
+                sig = ctsi_result.ca_vs_time[i]
+                return t_ns[:len(sig)].copy(), sig.copy()
+        # Fallback: use first cathode
         if len(ctsi_result.ca_collector_id) > 0:
-            sig = ctsi_result.ca_vs_time_preamp[0]
-            return t_preamp_ns[:len(sig)].copy(), sig.copy()
+            sig = ctsi_result.ca_vs_time[0]
+            return t_ns[:len(sig)].copy(), sig.copy()
 
     return None, None
 
@@ -187,15 +194,15 @@ def run_zscan(args):
         ctsi_res = ctsi_results.get(z_key)
 
         for contact_name, electrode_label in ZSCAN_ELECTRODES:
-            # SSD waveform
+            # SSD raw induced current
             ssd_contact = ssd_wf.get(contact_name, {})
-            ssd_t = ssd_contact.get("preamp_time_ns")
-            ssd_s = ssd_contact.get("preamp_signal")
+            ssd_t = ssd_contact.get("time_ns")
+            ssd_s = ssd_contact.get("current")
 
-            # CTSI waveform
+            # CTSI raw induced current
             ctsi_t, ctsi_s = None, None
             if ctsi_res is not None:
-                ctsi_t, ctsi_s = extract_ctsi_preamp(ctsi_res, spec, contact_name)
+                ctsi_t, ctsi_s = extract_ctsi_raw(ctsi_res, spec, contact_name)
 
             # Store panel data
             panel_id = f"z{z_key.replace('.', '_')}_{contact_name}"
@@ -325,7 +332,7 @@ def build_zscan_html(ssd_data, ctsi_spec, metrics, panels, output_path):
         trace_str = ",\n".join(traces)
         panel_js.append(f"""Plotly.newPlot('{panel_id}',[{trace_str}],{{
   title:'{title}',
-  xaxis:{{title:'Time (ns)'}},yaxis:{{title:'Normalized amplitude'}},
+  xaxis:{{title:'Time (ns)'}},yaxis:{{title:'Normalized induced current'}},
   margin:{{t:40,b:50,l:70,r:20}},hovermode:'x unified'
 }},C);""")
 
@@ -372,7 +379,7 @@ def build_zscan_html(ssd_data, ctsi_spec, metrics, panels, output_path):
 <span class="ctsi">CTSI</span> = C++ Transport Simulator</p>
 
 <h2>Pearson Correlation Summary</h2>
-<p>Shape similarity of preamp-shaped waveforms. Amplitude ratio (SSD/CTSI) shown in parentheses.</p>
+<p>Shape similarity of raw induced current waveforms. Amplitude ratio (SSD/CTSI) shown in parentheses.</p>
 {summary_table}
 
 <h2>Waveform Overlays</h2>
