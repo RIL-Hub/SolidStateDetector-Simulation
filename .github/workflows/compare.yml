@@ -33,13 +33,20 @@ jobs:
       - name: Clone weighting-potential-sim
         run: git clone https://github.com/MaxTeicheira/weighting-potential-sim.git
 
-      # ── CTSI setup ──
+      # ── Python setup (self-hosted runner has Python 3.9, need ≥3.10) ──
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: ctsi
+          create-args: python=3.11 numpy scipy matplotlib
+          init-shell: bash
+
       - name: Install Python deps
-        run: |
-          pip install numpy scipy matplotlib
-          pip install -e weighting-potential-sim
+        shell: micromamba-shell {0}
+        run: pip install -e weighting-potential-sim
 
       - name: Generate CTSI fields
+        shell: micromamba-shell {0}
         run: python weighting-potential-sim/generate_ctsi_v4_fields.py
 
       - name: Copy fields to CTSI
@@ -60,6 +67,7 @@ jobs:
 
       # ── CTSI: single event ──
       - name: Run CTSI event (center, mid-depth, 662 keV)
+        shell: micromamba-shell {0}
         run: |
           cd ctsi/ctsi
           python3 -m tools.ctsi_toolkit run-event \
@@ -67,6 +75,7 @@ jobs:
 
       # ── CTSI: z-scan ──
       - name: Run CTSI z-scan (9 depths)
+        shell: micromamba-shell {0}
         run: |
           cd ctsi/ctsi
           mkdir -p output/zscan
@@ -122,6 +131,7 @@ jobs:
 
       # ── Comparison: single event ──
       - name: Generate single-event comparison report
+        shell: micromamba-shell {0}
         run: |
           python3 ssd/scripts/compare.py \
             --mode single \
@@ -132,6 +142,7 @@ jobs:
 
       # ── Comparison: z-scan ──
       - name: Generate z-scan comparison report
+        shell: micromamba-shell {0}
         run: |
           python3 ssd/scripts/compare.py \
             --mode zscan \
