@@ -16,6 +16,11 @@ const Z_MM         = parse(Float64, get(ENV, "SSD_Z_MM", "0.0"))      # mid-dept
 const N_CARRIERS   = parse(Int,     get(ENV, "SSD_N_CARRIERS", "50"))
 const DT_NS        = 0.1
 const MAX_NSTEPS   = 50000
+const MODE         = get(ENV, "SSD_MODE", "single")  # "single" or "zscan"
+
+# Z-scan parameters (matching benchmark.jl)
+const Z_FROM_CATHODE = collect(0.5:0.5:4.5)  # mm, 9 depths
+const Z_SCAN         = Z_FROM_CATHODE .- 2.5  # mm, in SSD simulation coords
 
 # Preamp: b0=1400, τ=140μs at dt=0.1ns
 const PREAMP_B0    = 1400.0
@@ -68,57 +73,11 @@ t_wp = @elapsed for c in sim.detector.contacts
 end
 println("$(round(t_wp; digits=2))s")
 
-# ── Simulate event ──
-x_m = Float32(X_MM / 1000)
-y_m = Float32(Y_MM / 1000)
-z_m = Float32(Z_MM / 1000)
-
-println("\nSimulating event: ($X_MM, $Y_MM, $Z_MM) mm, $(ENERGY_KEV) keV, $N_CARRIERS carriers")
-pos = CartesianPoint{Float32}(x_m, y_m, z_m)
-evt = Event([pos], [ENERGY_KEV * u"keV"], N_CARRIERS; number_of_shells=2)
-t_sim = @elapsed simulate!(evt, sim; Δt=DT_NS * u"ns", max_nsteps=MAX_NSTEPS)
-println("Simulation: $(round(t_sim; digits=2))s")
-
 # ── Contact metadata ──
 contact_names = ["anode_1","anode_2","anode_3","anode_4","anode_5",
     "steering","cathode_1","cathode_2"]
 contact_types = ["anode","anode","anode","anode","anode",
     "steering","cathode","cathode"]
-
-# ── Extract and export ──
-println("Extracting waveforms …")
-
-waveforms = Dict{String, Any}()
-for (cid, wf) in enumerate(evt.waveforms)
-    ismissing(wf) && continue
-    t_ns = Float64.(ustrip.(u"ns", collect(wf.time)))
-    sig  = Float64.(ustrip.(collect(wf.signal)))
-    dt = t_ns[2] - t_ns[1]
-    cur = diff(sig) ./ dt
-    t_mid = t_ns[1:end-1] .+ dt/2
-
-    max_abs = maximum(abs, cur; init=0.0)
-    max_abs < 1e-15 && continue
-
-    # Preamp
-    t_pre, sig_pre = apply_preamp(cur, DT_NS, PREAMP_B0, PREAMP_A1;
-        display_us=PREAMP_DISPLAY_US, subsample=PREAMP_SUBSAMPLE)
-
-    # Subsample raw current for export (every 10th point)
-    raw_sub = 10
-    raw_idx = 1:raw_sub:length(cur)
-
-    waveforms[contact_names[cid]] = Dict(
-        "contact_id" => cid,
-        "contact_type" => contact_types[cid],
-        "raw_time_ns" => t_mid[raw_idx],
-        "raw_current" => cur[raw_idx],
-        "preamp_time_ns" => t_pre,
-        "preamp_signal" => sig_pre,
-        "charge_time_ns" => t_ns,
-        "charge_signal" => sig,
-    )
-end
 
 # ── Write JSON manually (avoid extra deps) ──
 function to_json(v::AbstractVector{<:Number})
@@ -162,18 +121,131 @@ function to_json(d::Dict)
     return String(take!(io))
 end
 
-output = Dict(
-    "simulator" => "SolidStateDetectors.jl",
-    "energy_keV" => Float64(ENERGY_KEV),
-    "position_mm" => Dict("x" => X_MM, "y" => Y_MM, "z" => Z_MM),
-    "n_carriers" => N_CARRIERS,
-    "dt_ns" => DT_NS,
-    "max_nsteps" => MAX_NSTEPS,
-    "preamp_b0" => PREAMP_B0,
-    "preamp_tau_us" => 140.0,
-    "waveforms" => waveforms,
-)
+"""Extract preamp waveforms from a simulated event, returning a Dict of contact_name => waveform data."""
+function extract_preamp_waveforms(evt)
+    waveforms = Dict{String, Any}()
+    for (cid, wf) in enumerate(evt.waveforms)
+        ismissing(wf) && continue
+        t_ns = Float64.(ustrip.(u"ns", collect(wf.time)))
+        sig  = Float64.(ustrip.(collect(wf.signal)))
+        dt = t_ns[2] - t_ns[1]
+        cur = diff(sig) ./ dt
 
-outfile = "output/ssd_waveforms.json"
-write(outfile, to_json(output) * "\n")
-println("Wrote $outfile")
+        max_abs = maximum(abs, cur; init=0.0)
+        max_abs < 1e-15 && continue
+
+        t_pre, sig_pre = apply_preamp(cur, DT_NS, PREAMP_B0, PREAMP_A1;
+            display_us=PREAMP_DISPLAY_US, subsample=PREAMP_SUBSAMPLE)
+
+        waveforms[contact_names[cid]] = Dict(
+            "contact_id" => cid,
+            "contact_type" => contact_types[cid],
+            "preamp_time_ns" => t_pre,
+            "preamp_signal" => sig_pre,
+        )
+    end
+    return waveforms
+end
+
+"""Extract full waveforms (raw + preamp + charge) from a simulated event."""
+function extract_full_waveforms(evt)
+    waveforms = Dict{String, Any}()
+    for (cid, wf) in enumerate(evt.waveforms)
+        ismissing(wf) && continue
+        t_ns = Float64.(ustrip.(u"ns", collect(wf.time)))
+        sig  = Float64.(ustrip.(collect(wf.signal)))
+        dt = t_ns[2] - t_ns[1]
+        cur = diff(sig) ./ dt
+        t_mid = t_ns[1:end-1] .+ dt/2
+
+        max_abs = maximum(abs, cur; init=0.0)
+        max_abs < 1e-15 && continue
+
+        t_pre, sig_pre = apply_preamp(cur, DT_NS, PREAMP_B0, PREAMP_A1;
+            display_us=PREAMP_DISPLAY_US, subsample=PREAMP_SUBSAMPLE)
+
+        raw_sub = 10
+        raw_idx = 1:raw_sub:length(cur)
+
+        waveforms[contact_names[cid]] = Dict(
+            "contact_id" => cid,
+            "contact_type" => contact_types[cid],
+            "raw_time_ns" => t_mid[raw_idx],
+            "raw_current" => cur[raw_idx],
+            "preamp_time_ns" => t_pre,
+            "preamp_signal" => sig_pre,
+            "charge_time_ns" => t_ns,
+            "charge_signal" => sig,
+        )
+    end
+    return waveforms
+end
+
+if MODE == "zscan"
+    # ── Z-scan mode: simulate at 9 depths ──
+    println("\n── Z-Scan: $(length(Z_SCAN)) depths, x=$(X_MM)mm, y=$(Y_MM)mm ──")
+
+    zscan = Dict{String, Any}()
+    x_m = Float32(X_MM / 1000)
+    y_m = Float32(Y_MM / 1000)
+
+    for (zi, z_mm) in enumerate(Z_SCAN)
+        z_from_cathode = Z_FROM_CATHODE[zi]
+        z_key = string(z_from_cathode)
+        z_m = Float32(z_mm / 1000)
+
+        print("  z=$(z_mm)mm ($(z_from_cathode)mm from cathode) … ")
+        pos = CartesianPoint{Float32}(x_m, y_m, z_m)
+        evt = Event([pos], [ENERGY_KEV * u"keV"], N_CARRIERS; number_of_shells=2)
+        t_sim = @elapsed simulate!(evt, sim; Δt=DT_NS * u"ns", max_nsteps=MAX_NSTEPS)
+        println("$(round(t_sim; digits=2))s")
+
+        zscan[z_key] = extract_preamp_waveforms(evt)
+    end
+
+    output = Dict(
+        "simulator" => "SolidStateDetectors.jl",
+        "mode" => "zscan",
+        "energy_keV" => Float64(ENERGY_KEV),
+        "x_mm" => X_MM,
+        "y_mm" => Y_MM,
+        "n_carriers" => N_CARRIERS,
+        "dt_ns" => DT_NS,
+        "preamp_tau_us" => 140.0,
+        "zscan" => zscan,
+    )
+
+    outfile = "output/ssd_zscan.json"
+    write(outfile, to_json(output) * "\n")
+    println("Wrote $outfile")
+
+else
+    # ── Single event mode (original behavior) ──
+    x_m = Float32(X_MM / 1000)
+    y_m = Float32(Y_MM / 1000)
+    z_m = Float32(Z_MM / 1000)
+
+    println("\nSimulating event: ($X_MM, $Y_MM, $Z_MM) mm, $(ENERGY_KEV) keV, $N_CARRIERS carriers")
+    pos = CartesianPoint{Float32}(x_m, y_m, z_m)
+    evt = Event([pos], [ENERGY_KEV * u"keV"], N_CARRIERS; number_of_shells=2)
+    t_sim = @elapsed simulate!(evt, sim; Δt=DT_NS * u"ns", max_nsteps=MAX_NSTEPS)
+    println("Simulation: $(round(t_sim; digits=2))s")
+
+    waveforms = extract_full_waveforms(evt)
+
+    output = Dict(
+        "simulator" => "SolidStateDetectors.jl",
+        "energy_keV" => Float64(ENERGY_KEV),
+        "position_mm" => Dict("x" => X_MM, "y" => Y_MM, "z" => Z_MM),
+        "n_carriers" => N_CARRIERS,
+        "dt_ns" => DT_NS,
+        "max_nsteps" => MAX_NSTEPS,
+        "preamp_b0" => PREAMP_B0,
+        "preamp_tau_us" => 140.0,
+        "waveforms" => waveforms,
+    )
+
+    outfile = "output/ssd_waveforms.json"
+    write(outfile, to_json(output) * "\n")
+    println("Wrote $outfile")
+end
