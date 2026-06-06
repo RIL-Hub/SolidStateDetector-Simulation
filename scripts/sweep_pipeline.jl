@@ -19,7 +19,7 @@ const REPO = abspath(joinpath(@__DIR__, ".."))
 const SWEEP_DIR = joinpath(REPO, "output", "sweep")
 const GEOMETRY = joinpath(REPO, "geometries", "czt_cross_strip_full.yaml")
 const CACHE = get(ENV, "SWEEP_CACHE", "1") == "1"
-const CACHE_FILE = joinpath(SWEEP_DIR, "sim_cache.jls")
+const CACHE_FILE = get(ENV, "SSD_CACHE", joinpath(SWEEP_DIR, "sim_cache.jls"))
 const REFINE = [0.2, 0.1, 0.05]
 
 const N_CARRIERS = 50

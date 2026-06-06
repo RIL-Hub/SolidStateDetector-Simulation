@@ -1,0 +1,132 @@
+name: GATE sweep pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'geometries/czt_cross_strip_full.yaml'
+      - 'scripts/load_gate_hits.py'
+      - 'scripts/sweep_pipeline.jl'
+      - 'scripts/ideal_sweep.jl'
+      - 'scripts/lateral_sweep.jl'
+      - 'scripts/build_wp_cache.jl'
+      - 'scripts/plot_sweep*.py'
+      - 'scripts/plot_ideal_vs_fuzzy.py'
+      - 'scripts/plot_depth_distribution.py'
+      - 'scripts/plot_lateral.py'
+      - 'Project.toml'
+      - '.github/workflows/sweep.yml'
+
+# Required repository variables (Settings -> Secrets and variables -> Actions -> Variables):
+#   GATE_DATA_DIR  path on the runner that holds blurred_merged_x*.root files
+#                  e.g. /data/RIL/gate_sim/blurred_merged_sweep
+#   SSD_CACHE      (optional) path to a pre-built Serialization cache of the
+#                  solved Simulation (electric field + all 48 WPs). If unset or
+#                  missing, sweep_pipeline.jl computes and writes it on the fly.
+
+jobs:
+  sweep:
+    name: Full sweep + ideal + lateral
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 120
+
+    env:
+      JULIA_NUM_THREADS: auto
+      GATE_DATA_DIR: ${{ vars.GATE_DATA_DIR }}
+      SSD_CACHE: ${{ vars.SSD_CACHE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate GATE_DATA_DIR
+        run: |
+          if [ -z "$GATE_DATA_DIR" ]; then
+            echo "::error::Repository variable GATE_DATA_DIR is not set" >&2
+            exit 1
+          fi
+          if [ ! -d "$GATE_DATA_DIR" ]; then
+            echo "::error::GATE_DATA_DIR=$GATE_DATA_DIR is not a directory on this runner" >&2
+            exit 1
+          fi
+          n=$(ls "$GATE_DATA_DIR"/blurred_merged_x*.root 2>/dev/null | wc -l)
+          echo "GATE_DATA_DIR: $GATE_DATA_DIR  ($n root files)"
+          [ "$n" -ge 1 ] || { echo "::error::no blurred_merged_x*.root files found" >&2; exit 1; }
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - name: Add LegendJuliaRegistry
+        run: |
+          julia -e '
+            using Pkg
+            Pkg.Registry.add(RegistrySpec(url="https://github.com/legend-exp/LegendJuliaRegistry"))
+            Pkg.Registry.add("General")
+          '
+
+      - name: Install Julia dependencies
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      # Self-hosted runner has Python 3.9 system-wide; we need >=3.10 + uproot.
+      - name: Setup Python (uproot)
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: gate_env
+          create-args: >-
+            python=3.11
+            uproot
+            awkward
+            numpy
+            scipy
+            matplotlib
+          init-shell: bash
+
+      - name: Generate per-file event CSVs (loader)
+        shell: micromamba-shell {0}
+        run: |
+          mkdir -p output/sweep
+          i=0
+          for f in "$GATE_DATA_DIR"/blurred_merged_x*.root; do
+            python scripts/load_gate_hits.py "$f" --n 5 --random --seed $i --outdir output/sweep
+            i=$((i+1))
+          done
+
+      - name: Run sweep pipeline (loads SSD_CACHE if present, else builds)
+        env:
+          SWEEP_CACHE: '1'
+        run: julia --project=. --threads=auto scripts/sweep_pipeline.jl
+
+      - name: Run ideal-position sweep
+        run: julia --project=. --threads=auto scripts/ideal_sweep.jl
+
+      - name: Run lateral charge-sharing scan
+        run: julia --project=. --threads=auto scripts/lateral_sweep.jl
+
+      - name: Generate plots
+        shell: micromamba-shell {0}
+        run: |
+          python scripts/plot_sweep.py output/sweep
+          python scripts/plot_sweep_aligned.py output/sweep
+          python scripts/plot_sweep_aligned.py output/sweep_ideal
+          python scripts/plot_sweep_variation.py output/sweep
+          python scripts/plot_ideal_vs_fuzzy.py
+          python scripts/plot_depth_distribution.py
+          python scripts/plot_lateral.py
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-results
+          path: |
+            output/sweep/*.png
+            output/sweep/*.json
+            output/sweep_ideal/*.png
+            output/sweep_ideal/*.json
+            output/lateral/*.png
+            output/lateral/*.json
+            output/depth_distribution.png
+          retention-days: 30
