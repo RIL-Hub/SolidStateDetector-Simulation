@@ -12,7 +12,7 @@ Run:  JULIA_NUM_THREADS=8 julia --project=. -t8 scripts/ideal_sweep.jl
 """
 
 const REPO = abspath(joinpath(@__DIR__, ".."))
-const CACHE_FILE = joinpath(REPO, "output", "sweep", "sim_cache.jls")
+const CACHE_FILE = get(ENV, "SSD_CACHE", joinpath(REPO, "output", "sweep", "sim_cache.jls"))
 const OUT_DIR = joinpath(REPO, "output", "sweep_ideal")
 const GEOMETRY = joinpath(REPO, "geometries", "czt_cross_strip_full.yaml")
 const REFINE = [0.2, 0.1, 0.05]

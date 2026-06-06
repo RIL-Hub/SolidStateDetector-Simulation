@@ -12,7 +12,7 @@ Run:  JULIA_NUM_THREADS=8 julia --project=. -t8 scripts/build_wp_cache.jl
 
 const REPO = abspath(joinpath(@__DIR__, ".."))
 const GEOMETRY = joinpath(REPO, "geometries", "czt_cross_strip_full.yaml")
-const CACHE_FILE = joinpath(REPO, "output", "sweep", "sim_cache.jls")
+const CACHE_FILE = get(ENV, "SSD_CACHE", joinpath(REPO, "output", "sweep", "sim_cache.jls"))
 const REFINE = [0.2, 0.1, 0.05]
 
 using SolidStateDetectors
