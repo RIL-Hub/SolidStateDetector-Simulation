@@ -20,7 +20,7 @@ const OUT_DIR = joinpath(REPO, "output", "lateral")
 const GEOMETRY = joinpath(REPO, "geometries", "czt_cross_strip_full.yaml")
 const REFINE = [0.2, 0.1, 0.05]
 
-const X_RANGE = -1.0:0.2:1.0           # 11 lateral positions (mm)
+const X_RANGE = -0.8:0.1:0.8            # 17 lateral positions (mm), fine scan across steering strips
 const Y_MM, Z_MM = 2.5, 0.0
 const ENERGY_KEV = 662.0
 const N_CARRIERS = 50
@@ -29,7 +29,7 @@ const NSHELLS = 2
 const DT_NS = 0.1
 const MAX_NSTEPS = 50000
 const PRIMARY_ANODE = 20
-const CAPTURE_ANODES = [18, 19, 20, 21, 22]
+const CAPTURE_ANODES = [19, 20, 21]
 const STEER_ID = 40
 const PREAMP_B0 = 1400.0
 const PREAMP_A1 = 0.9999992857142857
