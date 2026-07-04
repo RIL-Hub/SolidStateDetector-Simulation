@@ -1,0 +1,66 @@
+name: Thin Film Detector
+
+units:
+  length: mm
+  angle: deg
+  potential: V
+  temperature: K
+
+grid:
+  coordinates: cartesian
+  axes:
+    x:
+      from: -6
+      to: 6
+      boundaries: {left: reflecting, right: reflecting}
+    y:
+      from: -6
+      to: 6
+      boundaries: {left: reflecting, right: reflecting}
+    z:
+      from: -1
+      to: 1
+      boundaries: {left: reflecting, right: reflecting}
+
+medium: vacuum
+
+detectors:
+  - semiconductor:
+      material: Si                  # swap to CdZnTe, HPGe, etc.
+      temperature: 293              # K
+      geometry:
+        box:
+          widths: [10, 10, 0.3]     # x × y × z mm  (z = drift / thickness axis)
+
+      charge_drift_model:
+        model: IsotropicChargeDriftModel
+        mobilities:
+          e: 1350cm^2/(V*s)         # Si electron mobility
+          h: 480cm^2/(V*s)          # Si hole mobility
+
+      charge_trapping_model:
+        model: ConstantLifetime
+        parameters:
+          τe: 1ms                   # Si lifetime — much longer than CZT
+          τh: 1ms
+
+    contacts:
+      # Full-area anode — top face, 0 V
+      - id: 1
+        potential: 0
+        geometry:
+          box:
+            hX: 5                   # half of 10 mm → covers full x
+            hY: 5                   # half of 10 mm → covers full y
+            hZ: 0                   # surface contact
+            origin: [0, 0, 0.15]    # top face (z = +thickness/2)
+
+      # Full-area cathode — bottom face, bias voltage
+      - id: 2
+        potential: -100             # bias voltage (V) — adjust for full depletion
+        geometry:
+          box:
+            hX: 5
+            hY: 5
+            hZ: 0
+            origin: [0, 0, -0.15]   # bottom face (z = -thickness/2)
