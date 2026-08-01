@@ -1,0 +1,637 @@
+name: CZT Strip Detector (full 39 anodes / steering / 8 cathodes)
+
+units:
+  length: mm
+  angle: deg
+  potential: V
+  temperature: K
+
+grid:
+  coordinates: cartesian
+  axes:
+    x:
+      from: -22
+      to: 22
+      boundaries:
+        left: reflecting
+        right: reflecting
+    y:
+      from: -22
+      to: 22
+      boundaries:
+        left: reflecting
+        right: reflecting
+    z:
+      from: -4
+      to: 4
+      boundaries:
+        left: reflecting
+        right: reflecting
+
+medium: vacuum
+
+detectors:
+  - semiconductor:
+      material: CdZnTe
+      temperature: 293
+      geometry:
+        box:
+          widths: [40, 40, 5]
+      charge_drift_model:
+        model: IsotropicChargeDriftModel
+        mobilities:
+          e: 1000cm^2/(V*s)
+          h: 50cm^2/(V*s)
+      impurity_density:
+        name: constant
+        value: 0
+      charge_trapping_model:
+        model: ConstantLifetime
+        parameters:
+          τe: 1μs
+          τh: 1μs
+
+    contacts:
+      # ── Anode strips (z=+2.5 mm): 39 strips, 100 µm wide, 1 mm pitch, 0 V ──
+      - id: 1
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-19, 0, 2.5]
+      - id: 2
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-18, 0, 2.5]
+      - id: 3
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-17, 0, 2.5]
+      - id: 4
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-16, 0, 2.5]
+      - id: 5
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-15, 0, 2.5]
+      - id: 6
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-14, 0, 2.5]
+      - id: 7
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-13, 0, 2.5]
+      - id: 8
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-12, 0, 2.5]
+      - id: 9
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-11, 0, 2.5]
+      - id: 10
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-10, 0, 2.5]
+      - id: 11
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-9, 0, 2.5]
+      - id: 12
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-8, 0, 2.5]
+      - id: 13
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-7, 0, 2.5]
+      - id: 14
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-6, 0, 2.5]
+      - id: 15
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-5, 0, 2.5]
+      - id: 16
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-4, 0, 2.5]
+      - id: 17
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-3, 0, 2.5]
+      - id: 18
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-2, 0, 2.5]
+      - id: 19
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [-1, 0, 2.5]
+      - id: 20
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [0, 0, 2.5]
+      - id: 21
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [1, 0, 2.5]
+      - id: 22
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [2, 0, 2.5]
+      - id: 23
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [3, 0, 2.5]
+      - id: 24
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [4, 0, 2.5]
+      - id: 25
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [5, 0, 2.5]
+      - id: 26
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [6, 0, 2.5]
+      - id: 27
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [7, 0, 2.5]
+      - id: 28
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [8, 0, 2.5]
+      - id: 29
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [9, 0, 2.5]
+      - id: 30
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [10, 0, 2.5]
+      - id: 31
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [11, 0, 2.5]
+      - id: 32
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [12, 0, 2.5]
+      - id: 33
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [13, 0, 2.5]
+      - id: 34
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [14, 0, 2.5]
+      - id: 35
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [15, 0, 2.5]
+      - id: 36
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [16, 0, 2.5]
+      - id: 37
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [17, 0, 2.5]
+      - id: 38
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [18, 0, 2.5]
+      - id: 39
+        potential: 0
+        geometry:
+          box:
+            hX: 0.05
+            hY: 20.0
+            hZ: 0
+            origin: [19, 0, 2.5]
+      # ── Steering electrode (z=+2.5 mm): 400 µm strips at half-integer x, -80 V ──
+      - id: 40
+        potential: -120
+        geometry:
+          union:
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-19.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-18.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-17.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-16.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-15.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-14.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-13.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-12.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-11.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-10.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-9.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-8.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-7.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-6.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-5.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-4.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-3.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-2.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-1.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [-0.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [0.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [1.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [2.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [3.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [4.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [5.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [6.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [7.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [8.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [9.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [10.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [11.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [12.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [13.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [14.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [15.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [16.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [17.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [18.5, 0, 2.5]
+            - box:
+                hX: 0.2
+                hY: 20.0
+                hZ: 0
+                origin: [19.5, 0, 2.5]
+      # ── Cathode strips (z=-2.5 mm): 8 strips, 4.9 mm wide, 5 mm pitch, -600 V ──
+      - id: 41
+        potential: -600
+        geometry:
+          box:
+            hX: 20.0
+            hY: 2.45
+            hZ: 0
+            origin: [0, -17.5, -2.5]
+      - id: 42
+        potential: -600
+        geometry:
+          box:
+            hX: 20.0
+            hY: 2.45
+            hZ: 0
+            origin: [0, -12.5, -2.5]
+      - id: 43
+        potential: -600
+        geometry:
+          box:
+            hX: 20.0
+            hY: 2.45
+            hZ: 0
+            origin: [0, -7.5, -2.5]
+      - id: 44
+        potential: -600
+        geometry:
+          box:
+            hX: 20.0
+            hY: 2.45
+            hZ: 0
+            origin: [0, -2.5, -2.5]
+      - id: 45
+        potential: -600
+        geometry:
+          box:
+            hX: 20.0
+            hY: 2.45
+            hZ: 0
+            origin: [0, 2.5, -2.5]
+      - id: 46
+        potential: -600
+        geometry:
+          box:
+            hX: 20.0
+            hY: 2.45
+            hZ: 0
+            origin: [0, 7.5, -2.5]
+      - id: 47
+        potential: -600
+        geometry:
+          box:
+            hX: 20.0
+            hY: 2.45
+            hZ: 0
+            origin: [0, 12.5, -2.5]
+      - id: 48
+        potential: -600
+        geometry:
+          box:
+            hX: 20.0
+            hY: 2.45
+            hZ: 0
+            origin: [0, 17.5, -2.5]

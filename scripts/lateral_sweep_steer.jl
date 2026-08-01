@@ -1,31 +1,29 @@
 #!/usr/bin/env julia
 """
-Lateral charge-sharing scan past a primary anode, at 3 depths.
+Lateral charge-sharing scan at ONE depth (mid = z_ssd = 0) for a swept
+set of steering voltages.  Solves field on demand (no cache reuse — the
+steering voltage changes the E-field).
 
-x steps in 25 µm increments from -0.5 mm to +0.5 mm relative to the primary
-anode (anode_20 at x=0), covering the neighbor edge and one full pitch.
-For each x, the same event is simulated at 3 SSD z values corresponding to
-paper depths 0.5, 2.5, 4.5 mm from the anode surface (SSD z = 2.0, 0.0, -2.0
-since the anode surface is at z=+2.5).
+x range:  -0.5 to +0.5 mm, 25 µm step (41 points).
+Depth:    SSD z = 0 → 2.5 mm from anode (mid).
+Cloud:    r = 0.2 mm, 50 carriers, 2 shells.
 
-At each (x, z) we capture the preamp waveforms on anodes 19/20/21 and the
-steering electrode. Reuses the cached solved Simulation if present
-(SSD_CACHE env or output/sweep/sim_cache.jls).
-
-Output:  output/lateral/lateral_sweep_xz.json
-Run:     JULIA_NUM_THREADS=8 julia --project=. -t8 scripts/lateral_sweep.jl
+Reads:  ENV["GEOMETRY"] (default = czt_cross_strip_full.yaml)
+Writes: ENV["OUTPUT"]   (default = output/lateral/lateral_sweep_steer_<name>.json)
 """
 
 const REPO = abspath(joinpath(@__DIR__, ".."))
-const CACHE_FILE = get(ENV, "SSD_CACHE",
-    joinpath(REPO, "output", "sweep", "sim_cache.jls"))
-const OUT_DIR = joinpath(REPO, "output", "lateral")
-const GEOMETRY = joinpath(REPO, "geometries", "czt_cross_strip_full.yaml")
-const REFINE = [0.2, 0.1, 0.05]
+const GEOMETRY = get(ENV, "GEOMETRY",
+    joinpath(REPO, "geometries", "czt_cross_strip_full.yaml"))
+const OUT_JSON = get(ENV, "OUTPUT",
+    joinpath(REPO, "output", "lateral",
+             "lateral_sweep_steer_" *
+             replace(basename(GEOMETRY), ".yaml" => "") * ".json"))
 
-const X_RANGE = -0.5:0.010:0.5          # 101 lateral positions (mm), 10 µm step
-const Z_LIST_MM = [2.0, 0.0, -2.0]      # SSD z; = paper depths 0.5, 2.5, 4.5 mm from anode
-const Y_MM = 2.5
+const REFINE = [0.2, 0.1, 0.05]
+const X_RANGE = -0.5:0.025:0.5           # 41 lateral positions
+const Y_MM, Z_MM = 2.5, 0.0              # y on cathode_5, z = mid
+const DEPTH_MM = 2.5 - Z_MM
 const ENERGY_KEV = 662.0
 const N_CARRIERS = 50
 const CLOUD_RADIUS_MM = 0.2
@@ -35,12 +33,12 @@ const MAX_NSTEPS = 50000
 const PRIMARY_ANODE = 20
 const CAPTURE_ANODES = [19, 20, 21]
 const STEER_ID = 40
+const N_ANODE = 39
+const CATHODE_ID0 = STEER_ID
 const PREAMP_B0 = 1400.0
 const PREAMP_A1 = 0.9999992857142857
 const PREAMP_DISPLAY_US = 5.0
 const PREAMP_SUBSAMPLE = 5
-const N_ANODE = 39
-const CATHODE_ID0 = STEER_ID
 
 contact_name(id) = id <= N_ANODE ? "anode_$(id)" : (id == STEER_ID ? "steering" : "cathode_$(id - CATHODE_ID0)")
 contact_type(id) = id <= N_ANODE ? "anode" : (id == STEER_ID ? "steering" : "cathode")
@@ -74,16 +72,25 @@ end
 print("Loading SolidStateDetectors … "); flush(stdout)
 using SolidStateDetectors
 using Unitful; using Unitful: ustrip
-using Serialization
 println("ok")
 
-local sim
-if isfile(CACHE_FILE)
-    print("Loading cached simulation ($(round(filesize(CACHE_FILE)/1e6;digits=0)) MB) … "); flush(stdout)
-    t = @elapsed (sim = deserialize(CACHE_FILE)); println("$(round(t;digits=1))s")
-else
-    error("No cache at $CACHE_FILE. Build it with scripts/build_wp_cache.jl.")
+println("Geometry: $GEOMETRY")
+print("Parsing … "); flush(stdout)
+sim = Simulation{Float32}(GEOMETRY)
+println("$(length(sim.detector.contacts)) contacts")
+
+print("Electric potential … "); flush(stdout)
+t = @elapsed calculate_electric_potential!(sim; refinement_limits=REFINE,
+    convergence_limit=1e-6, depletion_handling=true)
+println("$(round(t;digits=1))s")
+calculate_electric_field!(sim)
+print("Weighting potentials for anodes 19/20/21 + steering (4 of 48) … "); flush(stdout)
+t = @elapsed for id in vcat(CAPTURE_ANODES, [STEER_ID])
+    print("$id "); flush(stdout)
+    calculate_weighting_potential!(sim, id; refinement_limits=REFINE,
+        convergence_limit=1e-6)
 end
+println(" done in $(round(t;digits=1))s")
 
 function extract(evt, ids)
     out = Dict{String,Any}()
@@ -105,45 +112,35 @@ function extract(evt, ids)
     return out
 end
 
-mkpath(OUT_DIR)
 ids = vcat(CAPTURE_ANODES, [STEER_ID])
 records = Dict{String,Any}[]
-println("Lateral scan past anode_$PRIMARY_ANODE at 3 depths (y=$Y_MM):")
-for z_mm in Z_LIST_MM
-    depth_from_anode = 2.5 - z_mm
-    println("─── z=$(z_mm) mm (depth $(depth_from_anode) mm from anode) ───")
-    for x in X_RANGE
-        print("  x=$(round(x;digits=3)) mm … "); flush(stdout)
-        pos = CartesianPoint{Float32}(Float32(x/1000), Float32(Y_MM/1000),
-                                       Float32(z_mm/1000))
-        evt = Event([pos], [Float32(ENERGY_KEV) * u"keV"], N_CARRIERS;
-            number_of_shells=NSHELLS, radius=[CLOUD_RADIUS_MM * u"mm"])
-        t = @elapsed simulate!(evt, sim; Δt=DT_NS * u"ns",
-                                 max_nsteps=MAX_NSTEPS)
-        push!(records, Dict{String,Any}(
-            "x_mm"=>x, "y_mm"=>Y_MM, "z_mm"=>z_mm,
-            "depth_from_anode_mm"=>depth_from_anode,
-            "energy_keV"=>ENERGY_KEV,
-            "primary_anode"=>contact_name(PRIMARY_ANODE),
-            "waveforms"=>extract(evt, ids)))
-        println("$(round(t;digits=1))s")
-    end
+println("Lateral scan at depth $DEPTH_MM mm from anode:")
+for x in X_RANGE
+    print("  x=$(round(x;digits=3)) mm … "); flush(stdout)
+    pos = CartesianPoint{Float32}(Float32(x/1000), Float32(Y_MM/1000),
+                                   Float32(Z_MM/1000))
+    evt = Event([pos], [Float32(ENERGY_KEV) * u"keV"], N_CARRIERS;
+        number_of_shells=NSHELLS, radius=[CLOUD_RADIUS_MM * u"mm"])
+    t = @elapsed simulate!(evt, sim; Δt=DT_NS * u"ns", max_nsteps=MAX_NSTEPS)
+    push!(records, Dict{String,Any}(
+        "x_mm"=>x, "y_mm"=>Y_MM, "z_mm"=>Z_MM,
+        "depth_from_anode_mm"=>DEPTH_MM, "energy_keV"=>ENERGY_KEV,
+        "primary_anode"=>contact_name(PRIMARY_ANODE),
+        "waveforms"=>extract(evt, ids)))
+    println("$(round(t;digits=1))s")
 end
 
 output = Dict{String,Any}(
     "simulator"=>"SolidStateDetectors.jl",
-    "scan"=>"lateral_xz",
+    "geometry_file"=>GEOMETRY,
     "primary_anode"=>contact_name(PRIMARY_ANODE),
-    "primary_anode_x_mm"=>0.0,
-    "y_mm"=>Y_MM,
-    "z_list_mm"=>collect(Z_LIST_MM),
+    "y_mm"=>Y_MM, "z_mm"=>Z_MM, "depth_from_anode_mm"=>DEPTH_MM,
     "captured_anodes"=>[contact_name(a) for a in CAPTURE_ANODES],
     "cloud_radius_mm"=>CLOUD_RADIUS_MM,
     "n_carriers"=>N_CARRIERS,
     "dt_ns"=>DT_NS,
-    "preamp_tau_us"=>140.0,
     "points"=>records,
 )
-out = joinpath(OUT_DIR, "lateral_sweep_xz.json")
-write(out, to_json(output) * "\n")
-println("Wrote $out")
+mkpath(dirname(OUT_JSON))
+write(OUT_JSON, to_json(output) * "\n")
+println("Wrote $OUT_JSON")
