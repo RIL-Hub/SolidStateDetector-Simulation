@@ -1,13 +1,23 @@
 """
-Decompose the induced charge on the collecting anode into electron and hole
-contributions for one interaction depth (~1 mm from anode).
+Sweep 9 interaction depths (0.5–4.5 mm from anode in 0.5 mm steps) and
+decompose the induced anode charge into electron and hole contributions —
+both with and without charge-carrier trapping — using Ramo's theorem.
 
-Uses Ramo's theorem applied to each individual drift path:
-  ΔQ_e(t) = +ΔΦ_w(r_e(t))   [electrons moving toward anode]
-  ΔQ_h(t) = -ΔΦ_w(r_h(t))   [holes moving away from anode]
+Physics:
+  ΔQ_e(t) = +ΔΦ_w(r_e(t))           electrons moving toward anode
+  ΔQ_h(t) = -ΔΦ_w(r_h(t))           holes moving toward cathode
+  q_trap(T) = Σ_j exp(-j·dt/τ)·ΔΦ_w  incremental survival weighting
 
-Both are positive contributions to the anode signal; the small-pixel effect
-means the anode WP ≈ 0 in the bulk so holes contribute very little.
+Small-pixel effect: anode WP ≈ 0 in the bulk, so holes contribute little
+except for events very close to the anode.
+
+Geometry: czt_cross_strip.yaml (8-contact simplified geometry)
+  τ_e = 5 µs, τ_h = 3 µs  (set in TAU_E_US / TAU_H_US constants below;
+  must match the values in the YAML charge_trapping_model block)
+
+Output: output/eh_polarization.json
+  Per-depth arrays: time_ns, q_electron_free, q_electron_trap,
+                    q_hole_free, q_hole_trap, q_total_free, q_total_trap
 
 Run:
   julia --project=. -t8 scripts/plot_z_sweep_polarization.jl

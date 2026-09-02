@@ -1,7 +1,22 @@
 """
-Export electric potential + field (xz slice at y=0) for Python plotting.
-Run:  julia --project=. -t8 scripts/plot_efield_xsection.jl
-      python scripts/plot_efield_xsection.py
+Solve electric potential and field for the simplified CZT geometry and export
+an xz cross-section slice (at y=0 mm) to JSON for Python plotting.
+
+The SSD grid is in metres; all exported arrays are converted to mm.
+2D arrays are written column-major (Julia default) — reshape in Python with:
+  np.array(data["pot_V"]).reshape((nx, nz), order="F")
+
+Output: output/efield_xsection.json
+  Keys: x_mm (nx,), z_mm (nz,), pot_V (nx*nz,), Ex_Vm (nx*nz,), Ez_Vm (nx*nz,)
+
+Produces 3 figures (via plot_efield_xsection.py):
+  efield_xsection_lines.png     — |E| heatmap + field streamlines
+  efield_xsection_contour.png   — |E| heatmap + equipotential contours
+  efield_xsection_potential.png — potential heatmap + streamlines
+
+Run:
+  julia --project=. -t8 scripts/plot_efield_xsection.jl
+  python scripts/plot_efield_xsection.py
 """
 
 using SolidStateDetectors

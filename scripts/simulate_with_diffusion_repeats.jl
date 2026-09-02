@@ -1,22 +1,30 @@
 #!/usr/bin/env julia
 """
-Simulate each (x, z) event N_REPEATS times with diffusion enabled AND
-a small (~30 µm σ) Gaussian jitter on the initial position — to
-produce stochastic spread in the waveforms suitable for error-bar
-overlays.
+Simulate each (x, z) position N_REPEATS times with diffusion AND a small
+(~30 µm σ) Gaussian position jitter to produce stochastic waveform spread
+suitable for error-bar overlays and beam-width studies.
 
-9 configurations (3 x × 3 z) × 10 repeats = 90 events. Uses the cached
-full-geometry solve.
+Configurations: $(length(X_LIST)) x-positions × 3 depths × 10 repeats.
+X positions: -0.5 to 0.0 mm across the anode strip in 0.1 mm steps.
+Depths (SSD z): 2.0, 0.0, -2.0 mm → 0.5, 2.5, 4.5 mm from anode.
 
-Reads:  ENV["SSD_CACHE"] (default = output/sweep/sim_cache.jls)
-Writes: output/lateral/stochastic_repeats.json
+Requires the full-geometry WP cache built by build_wp_cache.jl.
+Diffusion coefficients for CdZnTe are patched in at runtime (De=26, Dh=2.6 cm²/s).
+
+Reads:  ENV["SSD_CACHE"] (default = output/sim_cache.jls)
+        ENV["OUTPUT"]    (default = output/lateral/stochastic_repeats.json)
+Writes: JSON with per-repeat preamp waveforms for anode_19, anode_20, anode_21,
+        and steering; tagged by nominal and actual (x, y, z) position.
+
+Run:
+  julia --project=. -t8 scripts/simulate_with_diffusion_repeats.jl
 """
 
 using Random
 
 const REPO = abspath(joinpath(@__DIR__, ".."))
 const CACHE_FILE = get(ENV, "SSD_CACHE",
-    joinpath(REPO, "output", "sweep", "sim_cache.jls"))
+    joinpath(REPO, "output", "sim_cache.jls"))
 const OUT_JSON = get(ENV, "OUTPUT",
     joinpath(REPO, "output", "lateral", "stochastic_repeats.json"))
 

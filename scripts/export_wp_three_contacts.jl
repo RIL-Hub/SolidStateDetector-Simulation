@@ -1,7 +1,19 @@
-"""Extract 2D weighting-potential slices at y = 2.5 mm (primary
-cathode row) for three contacts: target anode (id=3), steering
-electrode (id=6), and primary cathode (id=8).  Exports to
-output/wp_three_contacts.json for Python plotting.
+"""
+Extract 2D weighting-potential (WP) slices at y = 2.5 mm for three contacts:
+  anode    (id=3)   — collecting electrode; shows small-pixel effect
+  steering (id=6)   — biased at −80 V; focuses charge toward anode strips
+  cathode  (id=8)   — primary cathode row at y>0
+
+Each slice is the xz plane at the nearest grid point to y=2.5 mm.
+Grid is in metres; exported x_mm and z_mm arrays are in mm.
+2D W arrays are written column-major — reshape in Python with:
+  np.array(d["W_2d"]).reshape((nx, nz), order="F")
+
+Output: output/wp_three_contacts.json
+  Structure: {"contacts": {"anode": {id, x_mm, z_mm, y_slice_mm, W_2d}, ...}}
+
+Run:
+  julia --project=. -t8 scripts/export_wp_three_contacts.jl
 """
 
 using SolidStateDetectors
