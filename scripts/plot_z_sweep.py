@@ -65,7 +65,7 @@ def get_trace(ev, key):
     if ch is None:
         return None, None
     t_us = np.asarray(ch["time_ns"]) / 1000.0
-    q    = np.asarray(ch["signal"]) / peak
+    q    = -np.asarray(ch["signal"]) / peak
     if t_us[-1] < DISPLAY_US:
         t_us = np.append(t_us, DISPLAY_US)
         q    = np.append(q,    q[-1])

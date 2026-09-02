@@ -20,7 +20,7 @@ const CACHE_FILE = get(ENV, "SSD_CACHE",
 const OUT_JSON = get(ENV, "OUTPUT",
     joinpath(REPO, "output", "lateral", "stochastic_repeats.json"))
 
-const X_LIST = [-0.4, -0.2, 0.0]
+const X_LIST = [-0.5, -0.4, -0.3, -0.2, -0.1, 0.0]
 const Z_LIST = [2.0, 0.0, -2.0]         # SSD z; depths 0.5, 2.5, 4.5 mm
 const Y_MM = 2.5
 const N_REPEATS = 10

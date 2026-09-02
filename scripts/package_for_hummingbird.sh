@@ -355,6 +355,70 @@ needed downstream.
 | C_f | 75 fF | 662 keV full collection ≈ 305 mV |
 | Threshold | 3 mV | 1% of 662 keV reference plateau |
 
+## Question for the user BEFORE launching the full sweep
+
+Two SSD physics features are OFF by default and were left off for the
+initial local dry-run. **Ask the user whether to enable either for the
+full Hummingbird sweep** — they change fidelity and cost.
+
+### Thermal diffusion (SSD `diffusion=true`)
+
+- What it does: adds thermal random walk to each carrier during drift.
+  Replaces the current position-jitter workaround with physical
+  stochasticity.
+- Cost: none per event (only marginal RNG overhead).
+- Requires: `SolidStateDetectors.material_properties[:CdZnTe]` must
+  include `De ≈ 25u"cm^2/s"` and `Dh ≈ 3u"cm^2/s"` (Einstein relation:
+  D = µ·kT/e at 300 K). CZT has no De/Dh set upstream, so this needs
+  a one-time override.
+- **CRITICAL**: the WP cache must be rebuilt AFTER injecting De/Dh.
+  Cached `Simulation` objects freeze `material_properties` at cache
+  time; a runtime override does NOT reach a deserialized sim. This is
+  a ~4 min one-time cost. Also update `zE_sweep.jl` and
+  `benchmark_zE_sweep.jl` to pass `diffusion=true` to `simulate!`.
+- Marked as "experimental" in the SSD 0.11 docs
+  (`docs/src/man/charge_drift.md`).
+- Recommend: **yes**, enable for publication-grade sweep. The position-
+  jitter workaround is a proxy; real diffusion is defensible.
+
+### Self-repulsion (SSD `self_repulsion=true`)
+
+- What it does: same-species Coulomb repulsion between carriers within
+  one cloud (electrons repel electrons, holes repel holes). NOT
+  electron-hole attraction (SSD does not model that).
+- Cost: **2–5× slower per event.** Full sweep goes from ~2.5 h to
+  ~6–12 h on 51 shards.
+- Requires: NBodyChargeCloud (already used by our sim). No cache
+  rebuild.
+- Physical relevance: significant for high-density interactions
+  (high-Z, low-energy X-rays); modest (~few %) for 662 keV in CZT with
+  100 µm cloud radius.
+- Also marked "experimental" in SSD 0.11 docs.
+- Recommend: **probably not** for the full sweep. Enable selectively
+  at a handful of (z, E) points as a sensitivity check if needed.
+
+If the user says "enable diffusion":
+1. Rebuild the cache with material overrides — add the following
+   BEFORE `Simulation{Float32}(GEOMETRY)` in `scripts/build_wp_cache.jl`:
+   ```julia
+   let base = SolidStateDetectors.material_properties[:CdZnTe]
+       SolidStateDetectors.material_properties[:CdZnTe] = merge(base, (
+           De = 25.0u"cm^2/s", Dh = 3.0u"cm^2/s",
+       ))
+   end
+   ```
+2. Rerun `julia --project=. -t 8 scripts/build_wp_cache.jl`.
+3. In `zE_sweep.jl` and `benchmark_zE_sweep.jl`: add `diffusion=true`
+   to every `simulate!` call. Remove the position-jitter block (search
+   for `JITTER_MM` and delete surrounding code).
+4. Re-run the benchmark to confirm timing is unchanged.
+5. Then submit the full sweep.
+
+If the user says "enable self-repulsion": add `self_repulsion=true`
+to the `simulate!` calls in `zE_sweep.jl` and `benchmark_zE_sweep.jl`.
+No cache rebuild. Expect ~3× wall time — adjust SLURM `--time=`
+accordingly.
+
 ## Where to look if things break
 
 - Julia script errors → `logs/shard_N.err`

@@ -23,8 +23,10 @@ mkpath(joinpath(REPO, "output"))
 
 const CSV_PATH = length(ARGS) >= 1 ? ARGS[1] :
     joinpath(REPO, "output", "gate_events_x+0.0mm.csv")
-const GEOMETRY = get(ENV, "SSD_GEOMETRY",
+const GEOMETRY   = get(ENV, "SSD_GEOMETRY",
     joinpath(REPO, "geometries", "czt_cross_strip_full.yaml"))
+const CACHE_FILE = get(ENV, "SSD_CACHE",
+    joinpath(REPO, "output", "sim_cache.jls"))
 
 const N_CARRIERS = parse(Int,     get(ENV, "SSD_N_CARRIERS", "50"))
 const DT_NS      = parse(Float64, get(ENV, "SSD_DT_NS", "0.1"))
@@ -141,27 +143,38 @@ println("Need weighting potentials for $(length(needed)) contacts: ",
 print("Loading SolidStateDetectors … "); flush(stdout)
 t_pkg = @elapsed using SolidStateDetectors
 using Unitful; using Unitful: ustrip
+using Serialization
 println("$(round(t_pkg; digits=1))s")
 
-print("Parsing geometry … "); flush(stdout)
-t_geom = @elapsed (sim = Simulation{Float32}(GEOMETRY))
-println("$(round(t_geom; digits=1))s ($(length(sim.detector.contacts)) contacts)")
+if isfile(CACHE_FILE)
+    print("Loading cached simulation from $(basename(CACHE_FILE)) … "); flush(stdout)
+    t_load = @elapsed sim = deserialize(CACHE_FILE)
+    n_wp = count(c -> !ismissing(sim.weighting_potentials[c.id]), sim.detector.contacts)
+    println("$(round(t_load; digits=1))s  ($(length(sim.detector.contacts)) contacts, $n_wp WPs cached)")
+else
+    println("No cache at $(CACHE_FILE) — computing fields on-the-fly.")
+    println("  Tip: run build_wp_cache.jl once to pre-build a full cache (~260s).")
 
-print("Electric potential (refine=$(REFINE)) … "); flush(stdout)
-t_pot = @elapsed calculate_electric_potential!(sim;
-    refinement_limits=REFINE, convergence_limit=1e-6, depletion_handling=true)
-println("$(round(t_pot; digits=1))s")
+    print("Parsing geometry … "); flush(stdout)
+    t_geom = @elapsed (sim = Simulation{Float32}(GEOMETRY))
+    println("$(round(t_geom; digits=1))s ($(length(sim.detector.contacts)) contacts)")
 
-print("Electric field … "); flush(stdout)
-t_field = @elapsed calculate_electric_field!(sim)
-println("$(round(t_field; digits=1))s")
+    print("Electric potential (refine=$(REFINE)) … "); flush(stdout)
+    t_pot = @elapsed calculate_electric_potential!(sim;
+        refinement_limits=REFINE, convergence_limit=1e-6, depletion_handling=true)
+    println("$(round(t_pot; digits=1))s")
 
-print("Weighting potentials … "); flush(stdout)
-t_wp = @elapsed for id in needed
-    print("$id "); flush(stdout)
-    calculate_weighting_potential!(sim, id; refinement_limits=REFINE, convergence_limit=1e-6)
+    print("Electric field … "); flush(stdout)
+    t_field = @elapsed calculate_electric_field!(sim)
+    println("$(round(t_field; digits=1))s")
+
+    print("Weighting potentials for $(length(needed)) contacts … "); flush(stdout)
+    t_wp = @elapsed for id in needed
+        print("$id "); flush(stdout)
+        calculate_weighting_potential!(sim, id; refinement_limits=REFINE, convergence_limit=1e-6)
+    end
+    println("\n  done in $(round(t_wp; digits=1))s")
 end
-println("\n  done in $(round(t_wp; digits=1))s")
 
 # ── Extract raw + preamp waveforms for the needed contacts ──
 function extract_waveforms(evt)
