@@ -1,6 +1,9 @@
 Manifest.toml
 output/
 *.jld2
+*.jls
 *.png
 *.pdf
 *.svg
+.DS_Store
+.claude/

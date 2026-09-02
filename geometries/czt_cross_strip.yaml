@@ -48,8 +48,8 @@ detectors:
       charge_trapping_model:
         model: ConstantLifetime
         parameters:
-          τe: 10μs
-          τh: 1μs
+          τe: 5μs
+          τh: 3μs
 
     contacts:
       # ── Anode strips (z = +2.5 mm, top face) ──
